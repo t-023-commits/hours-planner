@@ -25,6 +25,11 @@
   function defaultTeacherCounts(){
     return Object.fromEntries(YEARS.map(y=>[y,Object.fromEntries(D.departments.map(d=>{const n=D.teacherReference.find(x=>x.dept===d)?.count??null;return [d,[n,n]];}))]));
   }
+  function setTeacherCount(state,year,dept,count){
+    if(!YEARS.includes(year)||!TEACHING_DEPTS.includes(dept))throw new Error('교사 수를 바꿀 학년도와 교과를 확인해 주세요.');
+    if(count!==null&&(!Number.isInteger(count)||count<0||count>100))throw new Error('교사 수는 0~100 사이의 정수 또는 미정이어야 합니다.');
+    for(const y of YEARS.filter(y=>y>=year))state.teacherCounts[y][dept]=[count,count];
+  }
   const SHARED_DEPTS=['사회 공통','과학 공통·융합','교양'];
   const TEACHING_DEPTS=D.departments.filter(d=>!SHARED_DEPTS.includes(d));
   const sourceDepts=new Map(D.curriculum.map(r=>[r.id,r.dept]));
@@ -166,6 +171,88 @@
     if(students===0)return 0;
     return Math.max(1,(method==='round'?Math.round:Math.ceil)(students/size));
   }
+  function groupRows(state,row){
+    return state.rows.filter(r=>r.year===row.year&&r.cohort===row.cohort&&r.grade===row.grade&&r.term===row.term&&r.groupId===row.groupId);
+  }
+  const EDIT_FIELDS=['name','dept','enabled','hours','sections','students','notes'];
+  function groupSectionPlan(state,id,patch={}){
+    const row=state.rows.find(r=>r.id===id),group=row&&selectionGroup(row);
+    if(!group)throw new Error('반 수를 함께 조정할 선택군이 없습니다.');
+    const rows=clone(groupRows(state,row)),edited=rows.find(r=>r.id===id);
+    for(const field of EDIT_FIELDS)if(Object.hasOwn(patch,field))edited[field]=patch[field];
+    return balanceGroupSections({id,group:clone(group),classes:state.classes[row.cohort],target:group.picks*state.classes[row.cohort],rows,weights:Object.fromEntries(rows.map(r=>[r.id,r.sections])),note:''});
+  }
+  function groupSectionStatus(plan){
+    const active=plan.rows.filter(r=>r.enabled),unknown=active.filter(r=>r.sections===null).length;
+    const valid=plan.rows.every(r=>r.sections===null||Number.isInteger(r.sections)&&r.sections>=0&&r.sections<=100);
+    const actual=active.reduce((s,r)=>s+(num(r.sections)?r.sections:0),0);
+    return {actual,unknown,valid,canApply:valid&&actual<=plan.target&&(unknown>0||actual===plan.target)};
+  }
+  function balanceGroupSections(input){
+    const plan=clone(input),selected=plan.fixedId===null?null:plan.rows.find(r=>r.id===plan.id);
+    plan.note='';
+    const status=groupSectionStatus(plan);
+    if(!status.valid){plan.note='반 수는 0~100 사이의 정수로 입력해 주세요.';return plan;}
+    if(status.unknown){plan.note='미정 과목의 반 수는 임의로 정하지 않습니다. 모든 반 수를 입력한 뒤 자동 맞추기를 누르세요. 미정 상태로 저장할 수도 있습니다.';return plan;}
+    const fixed=selected?.enabled?selected.sections:0;
+    let remaining=plan.target-fixed;
+    if(remaining<0){plan.note='입력한 과목의 반 수가 선택군 전체 목표보다 큽니다. 반 수를 줄여 주세요.';return plan;}
+    // Closed and zero-section courses stay closed unless the user explicitly edits them.
+    let candidates=plan.rows.filter(r=>r.id!==selected?.id&&r.enabled).map(r=>({row:r,weight:plan.weights?.[r.id]??r.sections})).filter(c=>c.weight>0);
+    if(remaining>candidates.length*100){plan.note='나머지 개설 과목만으로 목표 반 수를 채울 수 없습니다. 아래에서 다른 과목의 반 수를 입력해 주세요.';return plan;}
+    // Largest remainder apportionment keeps integer totals exact. Saturation handles
+    // imported plans and large cohort settings while respecting the existing 100 cap.
+    while(candidates.length){
+      const weight=candidates.reduce((s,c)=>s+c.weight,0);
+      const capped=candidates.filter(c=>remaining*c.weight/weight>=100);
+      if(capped.length){for(const c of capped){c.row.sections=100;remaining-=100;}candidates=candidates.filter(c=>!capped.includes(c));continue;}
+      const quotas=candidates.map(c=>({...c,quota:remaining*c.weight/weight}));
+      for(const c of quotas)c.row.sections=Math.floor(c.quota);
+      let extras=remaining-quotas.reduce((s,c)=>s+c.row.sections,0);
+      quotas.sort((a,b)=>(b.quota-Math.floor(b.quota))-(a.quota-Math.floor(a.quota))||(a.row.id<b.row.id?-1:a.row.id>b.row.id?1:0));
+      for(const c of quotas)if(extras>0){c.row.sections++;extras--;}
+      break;
+    }
+    return plan;
+  }
+  function applyGroupSections(state,plan){
+    const row=state.rows.find(r=>r.id===plan.id),group=row&&selectionGroup(row);
+    if(!group||plan.target!==group.picks*state.classes[row.cohort])throw new Error('선택군 또는 학급 수가 바뀌었습니다. 다시 조정해 주세요.');
+    const expected=groupRows(state,row),ids=new Set(plan.rows.map(r=>r.id));
+    if(ids.size!==plan.rows.length||expected.length!==plan.rows.length||expected.some(r=>!ids.has(r.id)))throw new Error('같은 학년도·학년·학기의 선택군만 함께 조정할 수 있습니다.');
+    const status=groupSectionStatus(plan);
+    if(!status.canApply)throw new Error(status.valid?'선택군의 반 수 합계를 목표에 맞춰 주세요.':'반 수는 0~100 사이의 정수로 입력해 주세요.');
+    const next=clone(state),updates=[];
+    for(const draft of plan.rows){
+      const old=state.rows.find(r=>r.id===draft.id),target=next.rows.find(r=>r.id===draft.id);
+      const fields=draft.id===plan.id?EDIT_FIELDS:['sections'];
+      for(const field of fields)target[field]=draft[field];
+      if(fields.some(field=>old[field]!==target[field])){target.edited=true;updates.push(target);}
+    }
+    if(!groupSectionStatus({...plan,rows:groupRows(next,row)}).canApply)throw new Error('선택군의 반 수 합계를 목표에 맞춰 주세요.');
+    // Check the entire candidate before touching live state, including duplicate names.
+    validateState(next);
+    for(const update of updates)Object.assign(state.rows.find(r=>r.id===update.id),update);
+    return updates.length;
+  }
+  function autoSectionPlan(state,ids,size,method='ceil'){
+    const next=clone(state),groups=new Map(),selected=new Set(ids);
+    if(!Number.isInteger(size)||size<1||size>100)throw new Error('반당 기준 인원은 1~100 사이의 정수여야 합니다.');
+    for(const row of next.rows.filter(r=>selected.has(r.id)&&r.enabled&&!r.required&&r.students!==null)){
+      row.sections=recommendSections(row.students,size,method);
+      if(selectionGroup(row))groups.set(`${row.year}:${row.grade}:${row.term}:${row.groupId}`,row);
+    }
+    const plans=[];
+    for(const row of groups.values()){
+      const group=selectionGroup(row);
+      const plan=balanceGroupSections({id:row.id,fixedId:null,group:clone(group),classes:next.classes[row.cohort],target:group.picks*next.classes[row.cohort],rows:clone(groupRows(next,row)),note:''});
+      plans.push(plan);
+      for(const draft of plan.rows)next.rows.find(r=>r.id===draft.id).sections=draft.sections;
+    }
+    for(const row of next.rows){const old=state.rows.find(r=>r.id===row.id);if(old.sections!==row.sections)row.edited=true;}
+    next.classSize=size;
+    return {state:next,groups:plans,canApply:plans.every(p=>groupSectionStatus(p).canApply)};
+  }
   function groupChecks(state,year) {
     const checks=[];
     for(const grade of [2,3]) {
@@ -232,5 +319,5 @@
     return '"'+s.replaceAll('"','""')+'"';
   }
   function csv(matrix) {return '\ufeff'+matrix.map(row=>row.map(csvCell).join(',')).join('\r\n');}
-  root.Planner={YEARS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations};
+  root.Planner={YEARS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan};
 })(globalThis);
