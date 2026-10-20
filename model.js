@@ -34,10 +34,13 @@
   const TEACHING_DEPTS=D.departments.filter(d=>!SHARED_DEPTS.includes(d));
   const sourceDepts=new Map(D.curriculum.map(r=>[r.id,r.dept]));
   function sharedCategory(row){
+    if(row.relatedPlanning&&root.PLANNING_DATA?.rules.some(r=>r.name===row.name&&['역사','일반사회','지리','윤리'].includes(r.allowed[0])))return '사회 공통';
     const original=sourceDepts.get(row.id.slice(String(row.year).length+1));
     return SHARED_DEPTS.includes(original)?original:SHARED_DEPTS.includes(row.dept)?row.dept:null;
   }
   function receivingDepartments(row){
+    const rule=row.relatedPlanning&&root.PLANNING_DATA?.rules.find(r=>r.name===row.name);
+    if(rule)return rule.allowed.slice();
     const category=sharedCategory(row);
     return category==='사회 공통'?['역사','일반사회','지리','윤리']:category==='과학 공통·융합'?['물리학','화학','생명과학','지구과학']:category==='교양'?TEACHING_DEPTS:[];
   }
