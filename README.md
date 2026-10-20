@@ -82,3 +82,7 @@
 원본 HWPX·XLSX, analysis, tests, tmp 폴더는 웹에 업로드하지 않습니다. 학생 개인 자료는 포함하지 않습니다.
 
 공식 파일 업로드 안내: https://docs.github.com/en/repositories/working-with-files/managing-files/adding-a-file-to-a-repository
+
+## 인쇄 시수 표시 선택
+
+A4 인쇄 · PDF의 ‘시수 표시’에서 ‘교과 총시수만’ 또는 ‘자체·배정·총시수 모두’를 고릅니다. 교사 수·교사 1인 평균·학년별 개설 과목은 두 방식 모두 표시합니다. 선택한 방식은 이 브라우저에 저장되며 미리보기와 ‘현재 값으로 인쇄 / PDF 저장’에 적용됩니다. 기존 고정 PDF는 자체·배정·총시수 방식입니다.

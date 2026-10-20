@@ -4,7 +4,11 @@
  const areas={사회:['역사','일반사회','지리','윤리'],과학:['물리학','화학','생명과학','지구과학']};
  const categories={사회:'사회 공통',과학:'과학 공통·융합'};
  const rawWidths=[72,44,270,...Array(9).fill(40),42,52,52,52,66];
- const widths=rawWidths.map(w=>w/rawWidths.reduce((n,v)=>n+v,0)*277);
+ function reportWidths(hoursMode='detail'){
+  const selected=hoursMode==='total'?rawWidths.filter((_,i)=>i!==13&&i!==14):rawWidths;
+  return selected.map(w=>w/selected.reduce((n,v)=>n+v,0)*277);
+ }
+ const widths=reportWidths();
  const fmt=n=>n===null||n===undefined?'미정':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:2}).format(n);
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const kind=r=>({'공통':'공통','공통 과목':'공통','일반':'일반','일반선택':'일반','일반 선택':'일반',
@@ -15,8 +19,13 @@
  }
  function tripleCells(t){return t?[fmt(t.unit),fmt(t.sections),fmt(t.hours)]:['','',''];}
  function entryCells(e){return [e.kind,e.name,...e.triples.flatMap(tripleCells)];}
- function statCells(d){return d?[fmt(d.teachers),fmt(d.own),fmt(d.received),fmt(d.total),d.average===null?'미산정':fmt(d.average)+(d.partial?'*':'')]:['—','—','—','—','—'];}
- function build(state,{year=0,term=0,area='all',createdAt=new Date().toISOString()}={}){
+ function statCells(d,hoursMode='detail'){
+  const cells=d?[fmt(d.teachers),fmt(d.own),fmt(d.received),fmt(d.total),d.average===null?'미산정':fmt(d.average)+(d.partial?'*':'')]:['—','—','—','—','—'];
+  return hoursMode==='total'?[cells[0],cells[3],cells[4]]:cells;
+ }
+ function build(state,{year=0,term=0,area='all',hoursMode='detail',createdAt=new Date().toISOString()}={}){
+  hoursMode=hoursMode==='total'?'total':'detail';
+  const widths=reportWidths(hoursMode);
   const pages=[];
   for(const y of M.YEARS.filter(y=>!year||y===Number(year)))for(const t of [1,2].filter(t=>!term||t===Number(term)))for(const name of Object.keys(areas).filter(a=>area==='all'||a===area)){
    const depts=areas[name],all=state.rows.filter(r=>r.year===y&&r.term===t);
@@ -75,22 +84,23 @@
     classes:[1,2,3].map(g=>state.classes[y-g+1]),departments,stats,totals,gradeTotals,note,footnotes,
     entries:departments.flatMap(b=>b.entries),hasWarnings:outstanding||unknown>0||held.length>0||checks.length>0}));
   }
-  return {name:state.name,updatedAt:state.updatedAt||null,createdAt,widths,pages};
+  return {name:state.name,updatedAt:state.updatedAt||null,createdAt,hoursMode,widths,pages};
  }
  const text=s=>esc(s).replaceAll('\n','<br>');
- function tableHead(p){
-  return `<thead><tr><th rowspan="2">담당<br>교과</th><th rowspan="2">구분</th><th rowspan="2">과목명</th>${p.classes.map((c,i)=>`<th colspan="3">${i+1}학년 (${c}학급)</th>`).join('')}${['교사<br>수','자체<br>시수','배정<br>시수','교과<br>총시수','교사 1인<br>평균'].map(s=>`<th rowspan="2">${s}</th>`).join('')}</tr><tr>${p.classes.map(()=>'<th>반당<br>시수</th><th>담당<br>반 수</th><th>교과<br>시수</th>').join('')}</tr></thead>`;
+ function tableHead(p,hoursMode){
+  const labels=hoursMode==='total'?['교사<br>수','교과<br>총시수','교사 1인<br>평균']:['교사<br>수','자체<br>시수','배정<br>시수','교과<br>총시수','교사 1인<br>평균'];
+  return `<thead><tr><th rowspan="2">담당<br>교과</th><th rowspan="2">구분</th><th rowspan="2">과목명</th>${p.classes.map((c,i)=>`<th colspan="3">${i+1}학년 (${c}학급)</th>`).join('')}${labels.map(s=>`<th rowspan="2">${s}</th>`).join('')}</tr><tr>${p.classes.map(()=>'<th>반당<br>시수</th><th>담당<br>반 수</th><th>교과<br>시수</th>').join('')}</tr></thead>`;
  }
  function render(report){
   return report.pages.map((p,index)=>`<article class="report-page grouped-page" aria-label="${esc(p.title)} ${p.term}학기 ${p.part}쪽">
    <div class="report-heading"><h2>${esc(p.title)}</h2><span>${p.term}학기 · ${p.part}/${p.parts}</span></div>
    <p class="report-subtitle">${esc(p.subtitle)}</p>
-   <table class="report-grid"><colgroup>${widths.map(w=>`<col style="width:${w/277*100}%">`).join('')}</colgroup>${tableHead(p)}<tbody>
+   <table class="report-grid"><colgroup>${report.widths.map(w=>`<col style="width:${w/277*100}%">`).join('')}</colgroup>${tableHead(p,report.hoursMode)}<tbody>
    ${p.departments.map(block=>block.entries.map((e,i)=>`<tr class="${i===0?'report-dept-start':''}" data-report-key="${esc(block.dept+'|'+e.key)}">
    ${i===0?`<th class="report-department" rowspan="${block.entries.length}">${text(label(block.dept))}${block.continued?'<br><small>계속</small>':''}</th>`:''}
    ${e.cells.map((c,col)=>`<td class="${col===0?'report-kind':col===1?'report-course':(col-4)%3===0?'report-grade-hours':''}">${text(c)}</td>`).join('')}
-   ${i===0?statCells(block.stats).map((v,col)=>`<td class="report-dept-stat ${col===4?'report-dept-average':''}" rowspan="${block.entries.length}">${text(v)}</td>`).join(''):''}</tr>`).join('')).join('')}
-   <tr class="report-total"><th colspan="3">${p.area} 전체 · 학기 합계</th>${p.gradeTotals.map(n=>`<td></td><td></td><td>${fmt(n)}</td>`).join('')}${statCells(p.totals).map(n=>`<td>${text(n)}</td>`).join('')}</tr></tbody></table>
+   ${i===0?statCells(block.stats,report.hoursMode).map((v,col,values)=>`<td class="report-dept-stat ${col===values.length-1?'report-dept-average':''}" rowspan="${block.entries.length}">${text(v)}</td>`).join(''):''}</tr>`).join('')).join('')}
+   <tr class="report-total"><th colspan="3">${p.area} 전체 · 학기 합계</th>${p.gradeTotals.map(n=>`<td></td><td></td><td>${fmt(n)}</td>`).join('')}${statCells(p.totals,report.hoursMode).map(n=>`<td>${text(n)}</td>`).join('')}</tr></tbody></table>
    <p class="report-status">${esc(p.note)}${p.parts>1?' · 교과별 수치는 해당 교과 전체, 마지막 학기 합계는 모든 쪽을 합친 값입니다.':''}</p>
    <div class="report-footnotes">${p.footnotes.map(note=>`<p>${esc(note)}</p>`).join('')}</div>
    <div class="report-page-number"><span>시수 플래너 · ${esc(report.createdAt.slice(0,10))}</span><span>${index+1} / ${report.pages.length}</span></div></article>`).join('');
