@@ -18,7 +18,7 @@
     <p>미리보기 ${report.pages.length}쪽 · 인쇄 창에서 <b>PDF로 저장 → A4 → 가로 → 배율 100%</b>를 선택하세요. 머리글·바닥글은 끄세요. 웹에서 다시 수정하면 이 미리보기도 갱신됩니다.</p></section>
     ${report.pages.some(p=>p.hasWarnings)?'<div class="notice report-warning">미정·미배정 또는 선택군 점검 항목이 있습니다. 현재 입력된 값으로 출력하며, 확인이 필요한 평균에는 *가 표시됩니다.</div>':''}
     <div class="report-preview">${root.PrintReport.render(report)}</div>
-    <div class="report-links"><a class="button" href="downloads/adjusted-plan-print.pdf" target="_blank" rel="noopener">배정 반영 조율안 PDF (2026.10.20 고정본)</a><a href="downloads/adjusted-plan.json" download>배정 반영 예상안 JSON</a><span>고정본은 첨부 (2) 파일과 남은 사회·과학 시수 배정을 반영했습니다. 이후 수정값은 위 ‘현재 값으로 인쇄 / PDF 저장’을 사용하세요.</span></div>`;
+    <div class="report-links"><a class="button" href="downloads/adjusted-plan-print.pdf" target="_blank" rel="noopener">정수 배정 조율안 PDF (2026.10.20 고정본)</a><a href="downloads/adjusted-plan.json" download>정수 배정 예상안 JSON</a><span>고정본은 첨부 (4) 파일의 소수 배정을 정수로 정리한 값입니다. 이후 수정값은 위 ‘현재 값으로 인쇄 / PDF 저장’을 사용하세요.</span></div>`;
   }
   function change(e){if(e.target.id==='report-year')year=Number(e.target.value);else if(e.target.id==='report-term')term=Number(e.target.value);else if(e.target.id==='report-area')area=e.target.value;else return;
    document.querySelector('#main').innerHTML=view();

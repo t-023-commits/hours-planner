@@ -59,7 +59,9 @@
     const allowed=receivingDepartments(row),seen=new Set();
     for(const a of entries){
       if(!a||!allowed.includes(a.dept)||seen.has(a.dept))throw new Error('배정 가능한 교과를 확인해 주세요. 사회·과학은 해당 교과 안에서 배정합니다.');
-      if(!num(a.hours)||a.hours<=0||a.hours>4000||Math.abs(a.hours-round(a.hours))>0.00001)throw new Error('배정 시수는 소수 둘째 자리까지의 양수여야 합니다.');
+      if(!num(a.hours)||a.hours<=0||a.hours>4000||Math.abs(a.hours-round(a.hours))>0.00001)throw new Error('배정 시수는 1~4000 사이의 정수 양수여야 합니다.');
+      // Old backups remain readable; new allocation edits must use whole hours.
+      if(checkTotal&&!Number.isInteger(a.hours))throw new Error('배정 시수는 1시간 단위의 정수로 입력해 주세요.');
       seen.add(a.dept);
     }
     if(checkTotal&&entries.length){const total=hours(row),sum=round(entries.reduce((s,a)=>s+a.hours,0));if(total===null||total===0)throw new Error('개설 여부와 과목 총시수를 먼저 입력해 주세요.');if(sum>total+0.001)throw new Error('과목 총시수보다 많이 배정할 수 없습니다.');}
@@ -94,9 +96,40 @@
     const base=clone(state);base.rows.find(r=>r.id===id).allocations=[];
     const candidates=teacherSummary(base,row.year).filter(d=>receivingDepartments(row).includes(d.dept)).map(d=>({dept:d.dept,total:d.terms[row.term-1].total,teachers:d.terms[row.term-1].teachers,missing:d.terms[row.term-1].missing||d.terms[row.term-1].pendingTransfers,assigned:0})).filter(d=>d.teachers>0&&!d.missing);
     if(!candidates.length)return [];
-    let remaining=round(total);
-    while(remaining>0){const step=Math.min(0.5,remaining);candidates.sort((a,b)=>(a.total+a.assigned+step)/a.teachers-(b.total+b.assigned+step)/b.teachers||ranks[a.dept]-ranks[b.dept]);candidates[0].assigned=round(candidates[0].assigned+step);remaining=round(remaining-step);}
+    let remaining=Math.floor(total);
+    while(remaining>0){candidates.sort((a,b)=>(a.total+a.assigned)/a.teachers-(b.total+b.assigned)/b.teachers||(a.total+a.assigned+1)/a.teachers-(b.total+b.assigned+1)/b.teachers||ranks[a.dept]-ranks[b.dept]);candidates[0].assigned++;remaining--;}
     return candidates.filter(d=>d.assigned>0).map(d=>({dept:d.dept,hours:d.assigned}));
+  }
+  function integerAllocationPlan(input){
+    const state=clone(input),changes=[],skipped=[];
+    const rows=state.rows.filter(r=>(r.allocations||[]).some(a=>!Number.isInteger(a.hours)))
+      .sort((a,b)=>a.year-b.year||a.term-b.term||a.grade-b.grade||a.id.localeCompare(b.id));
+    for(const row of rows){
+      const before=clone(row.allocations),status=assignmentStatus(row);
+      const skip=reason=>skipped.push({id:row.id,year:row.year,term:row.term,name:row.name,reason});
+      // Do not round a partial total up, or turn a held allocation into an active one.
+      if(status.paused){skip('보류된 기존 배정은 그대로 보관합니다.');continue;}
+      if(!Number.isInteger(status.requested)){skip('배정 합계가 소수입니다. 과목별 배정 합계를 정수로 먼저 조정해 주세요.');continue;}
+      const summaries=teacherSummary(state,row.year);
+      const candidates=before.filter(a=>!Number.isInteger(a.hours)).map(a=>{
+        const t=summaries.find(d=>d.dept===a.dept)?.terms[row.term-1];
+        return {dept:a.dept,teachers:t?.teachers,total:t?.total,missing:t?.missing||t?.pendingTransfers,
+          fraction:round(a.hours-Math.floor(a.hours))};
+      });
+      if(candidates.some(a=>!(a.teachers>0)||a.missing)){skip('교사 수 또는 시수가 미정이거나 보류된 배정이 있어 평균을 비교할 수 없습니다.');continue;}
+      const after=before.map(a=>({...a,hours:Math.floor(a.hours)})),awards=[];
+      let remaining=status.requested-after.reduce((s,a)=>s+a.hours,0);
+      for(const a of candidates)a.total=round(a.total-a.fraction);
+      while(remaining>0){
+        candidates.sort((a,b)=>a.total/a.teachers-b.total/b.teachers||(a.total+1)/a.teachers-(b.total+1)/b.teachers||ranks[a.dept]-ranks[b.dept]);
+        const chosen=candidates[0];
+        awards.push({dept:chosen.dept,averageBefore:round(chosen.total/chosen.teachers)});
+        after.find(a=>a.dept===chosen.dept).hours++;chosen.total++;remaining--;
+      }
+      row.allocations=validateAllocations(row,after.filter(a=>a.hours>0));
+      changes.push({id:row.id,year:row.year,term:row.term,name:row.name,total:status.requested,before,after:clone(row.allocations),awards});
+    }
+    return {state,changes,skipped};
   }
 
   function chooseReference(row) {
@@ -322,5 +355,5 @@
     return '"'+s.replaceAll('"','""')+'"';
   }
   function csv(matrix) {return '\ufeff'+matrix.map(row=>row.map(csvCell).join(',')).join('\r\n');}
-  root.Planner={YEARS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan};
+  root.Planner={YEARS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,integerAllocationPlan,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan};
 })(globalThis);
