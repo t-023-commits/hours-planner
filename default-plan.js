@@ -1,4 +1,4 @@
-/* 사용자 제공 조율안 · 2026.10.20. 기존 브라우저의 개인 저장안은 유지합니다. */
+/* 사용자 조율안 (2) + 남은 사회·과학 시수 배정. 기존 배정 보존. */
 globalThis.PUBLISHED_PLAN = {
   "schema": 1,
   "name": "기본 예상안",
@@ -4067,7 +4067,20 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "윤리",
+          "hours": 20
+        },
+        {
+          "dept": "일반사회",
+          "hours": 24
+        },
+        {
+          "dept": "지리",
+          "hours": 4
+        }
+      ],
       "basis": "required"
     },
     {
@@ -4132,7 +4145,20 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "지구과학",
+          "hours": 28
+        },
+        {
+          "dept": "생명과학",
+          "hours": 12
+        },
+        {
+          "dept": "물리학",
+          "hours": 8
+        }
+      ],
       "basis": "required"
     },
     {
@@ -4197,7 +4223,20 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "생명과학",
+          "hours": 6
+        },
+        {
+          "dept": "지구과학",
+          "hours": 4
+        },
+        {
+          "dept": "물리학",
+          "hours": 2
+        }
+      ],
       "basis": "required"
     },
     {
@@ -4781,10 +4820,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2028,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": null,
-      "sections": null,
+      "sections": 0,
       "ref": null,
       "allocations": [],
       "basis": "missing"
@@ -5813,10 +5852,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2028,
       "curriculumCohort": 2026,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": null,
-      "sections": null,
+      "sections": 0,
       "ref": null,
       "allocations": [],
       "basis": "missing"
@@ -6405,10 +6444,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2028,
       "curriculumCohort": 2026,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": 0,
-      "sections": 0,
+      "sections": 1,
       "ref": {
         "cohort": 2025,
         "grade": 3,
@@ -6439,10 +6478,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2028,
       "curriculumCohort": 2026,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": 25,
-      "sections": 1,
+      "sections": 3,
       "ref": {
         "cohort": 2025,
         "grade": 3,
@@ -6750,7 +6789,16 @@ globalThis.PUBLISHED_PLAN = {
         "row": 49,
         "source": "과목별 선택인원 / 2학년=>3학년 / W49, X49"
       },
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "생명과학",
+          "hours": 12
+        },
+        {
+          "dept": "지구과학",
+          "hours": 9
+        }
+      ],
       "basis": "forecast"
     },
     {
@@ -6835,7 +6883,24 @@ globalThis.PUBLISHED_PLAN = {
         "row": 51,
         "source": "과목별 선택인원 / 2학년=>3학년 / W51, X51"
       },
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "물리학",
+          "hours": 12
+        },
+        {
+          "dept": "화학",
+          "hours": 15
+        },
+        {
+          "dept": "생명과학",
+          "hours": 6
+        },
+        {
+          "dept": "지구과학",
+          "hours": 6
+        }
+      ],
       "basis": "forecast"
     },
     {
@@ -7255,7 +7320,20 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "일반사회",
+          "hours": 24
+        },
+        {
+          "dept": "윤리",
+          "hours": 16
+        },
+        {
+          "dept": "지리",
+          "hours": 8
+        }
+      ],
       "basis": "required"
     },
     {
@@ -7279,7 +7357,24 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "지리",
+          "hours": 12
+        },
+        {
+          "dept": "역사",
+          "hours": 12
+        },
+        {
+          "dept": "윤리",
+          "hours": 12
+        },
+        {
+          "dept": "일반사회",
+          "hours": 12
+        }
+      ],
       "basis": "required"
     },
     {
@@ -7303,7 +7398,24 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "지구과학",
+          "hours": 24
+        },
+        {
+          "dept": "생명과학",
+          "hours": 12
+        },
+        {
+          "dept": "화학",
+          "hours": 8
+        },
+        {
+          "dept": "물리학",
+          "hours": 4
+        }
+      ],
       "basis": "required"
     },
     {
@@ -7327,7 +7439,24 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "물리학",
+          "hours": 12
+        },
+        {
+          "dept": "화학",
+          "hours": 20
+        },
+        {
+          "dept": "지구과학",
+          "hours": 8
+        },
+        {
+          "dept": "생명과학",
+          "hours": 8
+        }
+      ],
       "basis": "required"
     },
     {
@@ -7351,7 +7480,24 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "물리학",
+          "hours": 4
+        },
+        {
+          "dept": "화학",
+          "hours": 3
+        },
+        {
+          "dept": "생명과학",
+          "hours": 3
+        },
+        {
+          "dept": "지구과학",
+          "hours": 2
+        }
+      ],
       "basis": "required"
     },
     {
@@ -7375,7 +7521,24 @@ globalThis.PUBLISHED_PLAN = {
       "students": null,
       "sections": 12,
       "ref": null,
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "물리학",
+          "hours": 3
+        },
+        {
+          "dept": "지구과학",
+          "hours": 5
+        },
+        {
+          "dept": "생명과학",
+          "hours": 2
+        },
+        {
+          "dept": "화학",
+          "hours": 2
+        }
+      ],
       "basis": "required"
     },
     {
@@ -7918,10 +8081,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2029,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": null,
-      "sections": null,
+      "sections": 0,
       "ref": null,
       "allocations": [],
       "basis": "missing"
@@ -8882,10 +9045,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2029,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": 115,
-      "sections": 6,
+      "sections": 5,
       "ref": {
         "cohort": 2025,
         "grade": 3,
@@ -8916,10 +9079,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2029,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": 105,
-      "sections": 6,
+      "sections": 5,
       "ref": {
         "cohort": 2025,
         "grade": 3,
@@ -8950,10 +9113,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2029,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": 133,
-      "sections": 7,
+      "sections": 2,
       "ref": {
         "cohort": 2025,
         "grade": 3,
@@ -8984,10 +9147,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2029,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": null,
-      "sections": null,
+      "sections": 0,
       "ref": null,
       "allocations": [],
       "basis": "missing"
@@ -9406,10 +9569,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2029,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": 19,
-      "sections": 1,
+      "sections": 2,
       "ref": {
         "cohort": 2025,
         "grade": 3,
@@ -9440,10 +9603,10 @@ globalThis.PUBLISHED_PLAN = {
       "year": 2029,
       "curriculumCohort": 2027,
       "enabled": true,
-      "edited": false,
+      "edited": true,
       "notes": "",
       "students": 0,
-      "sections": 0,
+      "sections": 2,
       "ref": {
         "cohort": 2025,
         "grade": 3,
@@ -9751,7 +9914,16 @@ globalThis.PUBLISHED_PLAN = {
         "row": 49,
         "source": "과목별 선택인원 / 2학년=>3학년 / W49, X49"
       },
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "생명과학",
+          "hours": 15
+        },
+        {
+          "dept": "지구과학",
+          "hours": 6
+        }
+      ],
       "basis": "forecast"
     },
     {
@@ -9785,7 +9957,24 @@ globalThis.PUBLISHED_PLAN = {
         "row": 50,
         "source": "과목별 선택인원 / 2학년=>3학년 / W50, X50"
       },
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "물리학",
+          "hours": 3
+        },
+        {
+          "dept": "생명과학",
+          "hours": 6
+        },
+        {
+          "dept": "지구과학",
+          "hours": 3
+        },
+        {
+          "dept": "화학",
+          "hours": 3
+        }
+      ],
       "basis": "forecast"
     },
     {
@@ -9819,7 +10008,24 @@ globalThis.PUBLISHED_PLAN = {
         "row": 51,
         "source": "과목별 선택인원 / 2학년=>3학년 / W51, X51"
       },
-      "allocations": [],
+      "allocations": [
+        {
+          "dept": "지구과학",
+          "hours": 12
+        },
+        {
+          "dept": "화학",
+          "hours": 9
+        },
+        {
+          "dept": "물리학",
+          "hours": 6
+        },
+        {
+          "dept": "생명과학",
+          "hours": 9
+        }
+      ],
       "basis": "forecast"
     },
     {
@@ -10027,5 +10233,5 @@ globalThis.PUBLISHED_PLAN = {
       "basis": "forecast"
     }
   ],
-  "updatedAt": "2026-10-20T05:52:11.561Z"
+  "updatedAt": "2026-10-20T06:28:03.185Z"
 };

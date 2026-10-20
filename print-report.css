@@ -22,6 +22,20 @@
 .report-footnotes{font-size:9pt;margin-top:3mm;line-height:1.45}
 .report-footnotes p{margin:0 0 1mm}
 .report-page-number{display:flex;justify-content:space-between;font-size:9pt;margin-top:2mm;border-top:.3mm solid #888;padding-top:1mm}
+.grouped-page .report-grid{font-size:11pt;line-height:1.2}
+.grouped-page .report-grid th,.grouped-page .report-grid td{padding:.25mm .65mm;line-height:1.15;font-size:11pt;border:.2mm solid #888}
+.grouped-page .report-grid thead th{font-size:10pt;font-weight:800;padding:.8mm .3mm;line-height:1.12}
+.grouped-page .report-grid tbody td{height:auto}
+.grouped-page .report-grid .report-kind{text-align:center}
+.grouped-page .report-grid .report-course{text-align:left;font-weight:500}
+.grouped-page .report-grid .report-department{background:#eef1f3;text-align:center;font-weight:800;vertical-align:middle}
+.grouped-page .report-grid .report-dept-stat{background:#f2f3f4;font-weight:700;vertical-align:middle}
+.grouped-page .report-grid .report-dept-average{background:#e6ece7;font-weight:800}
+.grouped-page .report-grid .report-grade-hours{background:#f4f4f4}
+.grouped-page .report-grid .report-dept-start>*{border-top:.55mm solid #222}
+.grouped-page .report-grid .report-total th{text-align:left;background:#dce2e5;font-size:10.5pt}
+.grouped-page .report-status{margin:2mm 0 1mm}
+.grouped-page .report-footnotes{margin-top:1mm}
 @media screen{.report-page{zoom:var(--report-zoom,1)}}
 @page current-plan{size:A4 landscape;margin:10mm}
 @media print{
@@ -39,4 +53,6 @@
  .report-page thead{display:table-header-group}
  .report-page table,.report-page th,.report-page td{font-size:11pt!important}
  .report-page th,.report-page td{padding:1mm 1.5mm!important;line-height:1.3!important}
+ .grouped-page .report-grid th,.grouped-page .report-grid td{padding:.25mm .65mm!important;line-height:1.15!important}
+ .grouped-page .report-grid thead th{font-size:10pt!important;padding:.8mm .3mm!important;line-height:1.12!important}
 }
