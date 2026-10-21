@@ -36,9 +36,15 @@
 .grouped-page .report-grid .report-total th{text-align:left;background:#dce2e5;font-size:10.5pt}
 .grouped-page .report-status{margin:2mm 0 1mm}
 .grouped-page .report-footnotes{margin-top:1mm}
+.report-edit-count{font:inherit;line-height:inherit;color:#086d68!important;border:0;border-bottom:1px dotted #086d68;background:transparent;padding:0;cursor:pointer;border-radius:0;min-width:1.4em}
+.report-edit-count:hover,.report-edit-count:focus-visible{background:#e2f2ee;outline:1px solid #086d68}
+.report-print-count{display:none}
+.report-normalize{display:flex;width:100%;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;background:#fff7e7;border:1px solid #e9d5ad;border-radius:6px;font-size:.85rem}
 @media screen{.report-page{zoom:var(--report-zoom,1)}}
 @page current-plan{size:A4 landscape;margin:10mm}
 @media print{
+ .report-edit-count{display:none!important}
+ .report-print-count{display:inline!important}
  body[data-current-view="print"]{background:white;color:#111}
  body[data-current-view="print"]>.sidebar,body[data-current-view="print"] .topbar,
  body[data-current-view="print"] .workspace>footer,body[data-current-view="print"] .skip-link,

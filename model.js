@@ -91,15 +91,8 @@
       })};
     });
   }
-  function suggestAllocations(state,id){
-    const row=state.rows.find(r=>r.id===id),total=row&&hours(row);if(!row||!sharedCategory(row)||total===null||total<=0)return [];
-    const base=clone(state);base.rows.find(r=>r.id===id).allocations=[];
-    const candidates=teacherSummary(base,row.year).filter(d=>receivingDepartments(row).includes(d.dept)).map(d=>({dept:d.dept,total:d.terms[row.term-1].total,teachers:d.terms[row.term-1].teachers,missing:d.terms[row.term-1].missing||d.terms[row.term-1].pendingTransfers,assigned:0})).filter(d=>d.teachers>0&&!d.missing);
-    if(!candidates.length)return [];
-    let remaining=Math.floor(total);
-    while(remaining>0){candidates.sort((a,b)=>(a.total+a.assigned)/a.teachers-(b.total+b.assigned)/b.teachers||(a.total+a.assigned+1)/a.teachers-(b.total+b.assigned+1)/b.teachers||ranks[a.dept]-ranks[b.dept]);candidates[0].assigned++;remaining--;}
-    return candidates.filter(d=>d.assigned>0).map(d=>({dept:d.dept,hours:d.assigned}));
-  }
+  // All current suggestions use whole classes; the hour shape remains compatible with saved plans.
+  function suggestAllocations(state,id){return suggestSectionAllocations(state,id);}
   function integerAllocationPlan(input){
     const state=clone(input),changes=[],skipped=[];
     const rows=state.rows.filter(r=>(r.allocations||[]).some(a=>!Number.isInteger(a.hours)))
@@ -128,6 +121,76 @@
       }
       row.allocations=validateAllocations(row,after.filter(a=>a.hours>0));
       changes.push({id:row.id,year:row.year,term:row.term,name:row.name,total:status.requested,before,after:clone(row.allocations),awards});
+    }
+    return {state,changes,skipped};
+  }
+  function allocationSectionStep(row){
+    if(!num(row.hours)||row.hours<=0)return null;
+    const cents=Math.round(row.hours*100);
+    if(Math.abs(cents-row.hours*100)>0.00001)return null;
+    let a=cents,b=100;while(b){const remainder=a%b;a=b;b=remainder;}
+    return 100/a;
+  }
+  function assignedSections(row,hours){
+    if(!(row.hours>0))return null;
+    const n=hours/row.hours;
+    return Math.abs(n-Math.round(n))<1e-8?Math.round(n):n;
+  }
+  function needsWholeSections(row){
+    return (row.allocations||[]).some(a=>!Number.isInteger(a.hours)||!Number.isInteger(assignedSections(row,a.hours)));
+  }
+  function sectionEntries(row,entries){
+    if(!Array.isArray(entries))throw new Error('담당 반 수를 확인해 주세요.');
+    const step=allocationSectionStep(row);
+    if(!step&&entries.some(a=>a.sections>0))throw new Error('반당 시수를 먼저 입력해 주세요.');
+    for(const a of entries)if(!a||!Number.isInteger(a.sections)||a.sections<0||a.sections>100||a.sections%(step||1)!==0)throw new Error(`담당 반 수는 ${step||1}반 단위의 정수로 입력해 주세요.`);
+    return validateAllocations(row,entries.filter(a=>a.sections>0).map(a=>({dept:a.dept,hours:round(a.sections*row.hours)})));
+  }
+  function setAllocationSections(state,id,entries){
+    const row=state.rows.find(r=>r.id===id);
+    if(!row||!sharedCategory(row))throw new Error('배정할 공통·융합·교양 과목을 찾지 못했습니다.');
+    row.allocations=sectionEntries(row,entries);
+  }
+  function suggestSectionAllocations(state,id){
+    const row=state.rows.find(r=>r.id===id),total=row&&hours(row),step=row&&allocationSectionStep(row);
+    if(!row||!sharedCategory(row)||!(total>0)||!step)return [];
+    const base=clone(state);base.rows.find(r=>r.id===id).allocations=[];
+    const quantum=round(row.hours*step);
+    const candidates=teacherSummary(base,row.year).filter(d=>receivingDepartments(row).includes(d.dept)).map(d=>{
+      const t=d.terms[row.term-1];return {dept:d.dept,total:t.total,teachers:t.teachers,missing:t.missing||t.pendingTransfers,assigned:0};
+    }).filter(d=>d.teachers>0&&!d.missing);
+    if(!candidates.length)return [];
+    for(let remaining=Math.floor(row.sections/step);remaining>0;remaining--){
+      candidates.sort((a,b)=>(a.total+a.assigned)/a.teachers-(b.total+b.assigned)/b.teachers||(a.total+a.assigned+quantum)/a.teachers-(b.total+b.assigned+quantum)/b.teachers||ranks[a.dept]-ranks[b.dept]);
+      candidates[0].assigned+=quantum;
+    }
+    return candidates.filter(a=>a.assigned>0).map(a=>({dept:a.dept,hours:a.assigned}));
+  }
+  function wholeSectionAllocationPlan(input,ids=null){
+    const state=clone(input),changes=[],skipped=[];
+    const rows=state.rows.filter(r=>(!ids||ids.includes(r.id))&&needsWholeSections(r)).sort((a,b)=>a.year-b.year||a.term-b.term||a.grade-b.grade||a.id.localeCompare(b.id));
+    for(const row of rows){
+      const before=clone(row.allocations),status=assignmentStatus(row),step=allocationSectionStep(row);
+      const skip=reason=>skipped.push({id:row.id,year:row.year,term:row.term,name:row.name,reason});
+      if(status.paused){skip('보류된 기존 배정은 그대로 보관합니다. 배정 수정에서 확인해 주세요.');continue;}
+      if(!step){skip('반당 시수가 미정이거나 반 단위로 환산할 수 없습니다.');continue;}
+      const quantum=round(row.hours*step),blocks=status.requested/quantum;
+      if(Math.abs(blocks-Math.round(blocks))>1e-8){skip('기존 배정 합계가 온전한 반 단위가 아닙니다. 담당 반 수를 직접 조정해 주세요.');continue;}
+      const summary=teacherSummary(state,row.year);
+      const candidates=before.filter(a=>Math.abs(a.hours/quantum-Math.round(a.hours/quantum))>1e-8).map(a=>{
+        const t=summary.find(d=>d.dept===a.dept)?.terms[row.term-1];
+        const floor=Math.floor(a.hours/quantum+1e-8)*quantum;
+        return {dept:a.dept,total:round(t.total-a.hours+floor),teachers:t.teachers,missing:t.missing||t.pendingTransfers};
+      });
+      if(candidates.some(a=>!(a.teachers>0)||a.missing)){skip('교사 수 또는 시수가 미정이거나 보류된 배정이 있어 평균을 비교할 수 없습니다.');continue;}
+      const after=before.map(a=>({dept:a.dept,hours:Math.floor(a.hours/quantum+1e-8)*quantum}));
+      let remaining=Math.round((status.requested-after.reduce((n,a)=>n+a.hours,0))/quantum);
+      while(remaining>0){
+        candidates.sort((a,b)=>a.total/a.teachers-b.total/b.teachers||(a.total+quantum)/a.teachers-(b.total+quantum)/b.teachers||ranks[a.dept]-ranks[b.dept]);
+        const chosen=candidates[0];after.find(a=>a.dept===chosen.dept).hours+=quantum;chosen.total+=quantum;remaining--;
+      }
+      row.allocations=sectionEntries(row,after.map(a=>({dept:a.dept,sections:assignedSections(row,a.hours)})));
+      changes.push({id:row.id,year:row.year,term:row.term,grade:row.grade,name:row.name,unit:row.hours,sections:row.sections,total:status.requested,before,after:clone(row.allocations)});
     }
     return {state,changes,skipped};
   }
@@ -355,5 +418,5 @@
     return '"'+s.replaceAll('"','""')+'"';
   }
   function csv(matrix) {return '\ufeff'+matrix.map(row=>row.map(csvCell).join(',')).join('\r\n');}
-  root.Planner={YEARS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,integerAllocationPlan,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan};
+  root.Planner={YEARS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,integerAllocationPlan,allocationSectionStep,assignedSections,needsWholeSections,sectionEntries,setAllocationSections,suggestSectionAllocations,wholeSectionAllocationPlan,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan};
 })(globalThis);

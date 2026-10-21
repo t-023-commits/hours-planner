@@ -82,11 +82,11 @@
     if(M.hours(r)===0)continue;
     const eligible=M.receivingDepartments(r).map(d=>depts.indexOf(d)).filter(i=>i>=0&&counts[i]>0&&!unknown[i]);
     if(M.hours(r)===null||!eligible.length){result.unassigned.push(r.name);continue;}
-    // Keep whole classes for ordinary integer-hour courses. For a custom
-    // fractional-hour course, allocate only complete hours and leave the rest visible.
-    const quantum=Number.isInteger(r.hours)?r.hours:1;
-    for(let i=0;i<Math.floor(M.hours(r)/quantum);i++)tokens.push({r,i,h:quantum,eligible,dept:-1});
-    if(!Number.isInteger(M.hours(r)))result.unassigned.push(r.name);
+    const step=M.allocationSectionStep(r);
+    if(!step){result.unassigned.push(r.name);continue;}
+    const quantum=M.round(r.hours*step);
+    for(let i=0;i<Math.floor(r.sections/step);i++)tokens.push({r,i,h:quantum,eligible,dept:-1});
+    if(r.sections%step)result.unassigned.push(r.name);
    }
    tokens.sort((a,b)=>a.eligible.length-b.eligible.length||b.h-a.h||a.r.grade-b.r.grade||(a.r.assignmentOrder??a.r.sourceRow)-(b.r.assignmentOrder??b.r.sourceRow)||a.i-b.i);
    const cost=(v,d)=>v*v/counts[d];

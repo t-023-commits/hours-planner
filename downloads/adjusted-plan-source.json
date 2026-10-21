@@ -527,7 +527,7 @@
       "allocations": [
         {
           "dept": "윤리",
-          "hours": 16.5
+          "hours": 16
         },
         {
           "dept": "지리",
@@ -535,7 +535,7 @@
         },
         {
           "dept": "역사",
-          "hours": 13.5
+          "hours": 14
         },
         {
           "dept": "일반사회",
@@ -568,11 +568,11 @@
       "allocations": [
         {
           "dept": "지구과학",
-          "hours": 22.5
+          "hours": 22
         },
         {
           "dept": "생명과학",
-          "hours": 19.5
+          "hours": 20
         },
         {
           "dept": "물리학",
@@ -671,11 +671,11 @@
       "allocations": [
         {
           "dept": "화학",
-          "hours": 10.5
+          "hours": 10
         },
         {
           "dept": "지구과학",
-          "hours": 1.5
+          "hours": 2
         }
       ],
       "basis": "required"
@@ -2956,19 +2956,19 @@
       "allocations": [
         {
           "dept": "한문",
-          "hours": 3.5
+          "hours": 4
         },
         {
           "dept": "음악",
-          "hours": 3.5
+          "hours": 3
         },
         {
           "dept": "미술",
-          "hours": 3.5
+          "hours": 3
         },
         {
           "dept": "중국어",
-          "hours": 1.5
+          "hours": 2
         }
       ],
       "basis": "actual"
@@ -3007,11 +3007,11 @@
       "allocations": [
         {
           "dept": "음악",
-          "hours": 1.5
+          "hours": 2
         },
         {
           "dept": "미술",
-          "hours": 1.5
+          "hours": 1
         },
         {
           "dept": "한문",
@@ -3573,11 +3573,11 @@
       "allocations": [
         {
           "dept": "물리학",
-          "hours": 9.5
+          "hours": 9
         },
         {
           "dept": "화학",
-          "hours": 14.5
+          "hours": 15
         }
       ],
       "basis": "actual"
@@ -3620,11 +3620,11 @@
         },
         {
           "dept": "화학",
-          "hours": 8.5
+          "hours": 9
         },
         {
           "dept": "지구과학",
-          "hours": 7.5
+          "hours": 7
         },
         {
           "dept": "생명과학",
@@ -4057,11 +4057,11 @@
         },
         {
           "dept": "일반사회",
-          "hours": 24.5
+          "hours": 24
         },
         {
           "dept": "지리",
-          "hours": 4.5
+          "hours": 5
         }
       ],
       "basis": "required"
@@ -4131,11 +4131,11 @@
       "allocations": [
         {
           "dept": "지구과학",
-          "hours": 20.5
+          "hours": 20
         },
         {
           "dept": "생명과학",
-          "hours": 17.5
+          "hours": 18
         },
         {
           "dept": "물리학",
@@ -4238,19 +4238,19 @@
       "allocations": [
         {
           "dept": "생명과학",
-          "hours": 5.5
+          "hours": 5
         },
         {
           "dept": "물리학",
-          "hours": 1.5
+          "hours": 2
         },
         {
           "dept": "화학",
-          "hours": 2.5
+          "hours": 2
         },
         {
           "dept": "지구과학",
-          "hours": 2.5
+          "hours": 3
         }
       ],
       "basis": "required"
@@ -6767,11 +6767,11 @@
       "allocations": [
         {
           "dept": "생명과학",
-          "hours": 10.5
+          "hours": 11
         },
         {
           "dept": "지구과학",
-          "hours": 10.5
+          "hours": 10
         }
       ],
       "basis": "forecast"
@@ -6810,19 +6810,19 @@
       "allocations": [
         {
           "dept": "물리학",
-          "hours": 4.5
+          "hours": 4
         },
         {
           "dept": "화학",
-          "hours": 5.5
+          "hours": 6
         },
         {
           "dept": "생명과학",
-          "hours": 5.5
+          "hours": 5
         },
         {
           "dept": "지구과학",
-          "hours": 2.5
+          "hours": 3
         }
       ],
       "basis": "forecast"
@@ -6865,7 +6865,7 @@
         },
         {
           "dept": "화학",
-          "hours": 16.5
+          "hours": 17
         },
         {
           "dept": "생명과학",
@@ -6873,7 +6873,7 @@
         },
         {
           "dept": "지구과학",
-          "hours": 5.5
+          "hours": 5
         }
       ],
       "basis": "forecast"
@@ -7339,11 +7339,11 @@
         },
         {
           "dept": "역사",
-          "hours": 10.5
+          "hours": 11
         },
         {
           "dept": "윤리",
-          "hours": 10.5
+          "hours": 10
         },
         {
           "dept": "일반사회",
@@ -7376,19 +7376,19 @@
       "allocations": [
         {
           "dept": "생명과학",
-          "hours": 14.5
+          "hours": 14
         },
         {
           "dept": "지구과학",
-          "hours": 14.5
+          "hours": 14
         },
         {
           "dept": "물리학",
-          "hours": 7.5
+          "hours": 8
         },
         {
           "dept": "화학",
-          "hours": 11.5
+          "hours": 12
         }
       ],
       "basis": "required"
@@ -9919,7 +9919,7 @@
       "allocations": [
         {
           "dept": "화학",
-          "hours": 4.5
+          "hours": 4
         },
         {
           "dept": "생명과학",
@@ -9931,7 +9931,7 @@
         },
         {
           "dept": "물리학",
-          "hours": 2.5
+          "hours": 3
         }
       ],
       "basis": "forecast"
@@ -9970,19 +9970,19 @@
       "allocations": [
         {
           "dept": "물리학",
-          "hours": 10.5
+          "hours": 10
         },
         {
           "dept": "화학",
-          "hours": 15.5
+          "hours": 16
         },
         {
           "dept": "생명과학",
-          "hours": 5.5
+          "hours": 6
         },
         {
           "dept": "지구과학",
-          "hours": 4.5
+          "hours": 4
         }
       ],
       "basis": "forecast"
@@ -10192,5 +10192,5 @@
       "basis": "forecast"
     }
   ],
-  "updatedAt": "2026-10-20T06:47:51.973Z"
+  "updatedAt": "2026-10-20T07:00:54.502Z"
 }

@@ -56,14 +56,15 @@
     for(const e of block.entries){e.cells=entryCells(e);e.lines=Math.max(...e.cells.map((c,i)=>lineCount(c,widths[i+1])));e.height=4.5*e.lines+0.9;}
    }
    const remaining=M.round(shared.reduce((n,r)=>n+(M.assignmentStatus(r).remaining??0),0)),unknown=relevant.filter(r=>M.hours(r)===null).length;
+   const fractional=shared.filter(M.needsWholeSections).length;
    const checks=M.groupChecks(state,y).filter(g=>g.term===t&&(g.actual!==g.target||g.unknown)&&relevant.some(r=>r.groupId===g.id));
    const held=shared.filter(r=>M.assignmentStatus(r).over);
-   const note=`미배정 ${fmt(remaining)}시간 · 시수 미정 ${unknown}과목`+(held.length?` · 배정 보류 ${held.length}과목`:'')+(checks.length?` · 선택군 점검 ${checks.length}개`:'');
+   const note=`미배정 ${fmt(remaining)}시간 · 시수 미정 ${unknown}과목`+(held.length?` · 배정 보류 ${held.length}과목`:'')+(fractional?` · 반 단위 배정 확인 ${fractional}과목`:'')+(checks.length?` · 선택군 점검 ${checks.length}개`:'');
    const totals={teachers:stats.some(d=>d.teachers===null)?null:stats.reduce((n,d)=>n+d.teachers,0),own:M.round(stats.reduce((n,d)=>n+d.own,0)),received:M.round(stats.reduce((n,d)=>n+d.received,0)),total:M.round(stats.reduce((n,d)=>n+d.total,0)),partial:stats.some(d=>d.partial)};
    totals.average=totals.teachers>0?M.round(totals.total/totals.teachers):null;
    const gradeTotals=[1,2,3].map(g=>M.round(blocks.filter(b=>b.stats).flatMap(b=>b.entries).reduce((n,e)=>n+(e.triples[g-1]?.hours??0),0)));
    const footnotes=[
-    '반 수는 해당 교과의 담당 반 수입니다. 나눠 맡은 과목은 배정 시수 ÷ 반당 시수로 환산하며 소수 둘째 자리까지 표시합니다.',
+    '담당 반 수 × 반당 시수 = 교과 시수입니다. 공통·융합·교양 과목은 담당 교과에 온전한 반 단위로 배정합니다.',
     '교사 평균 = 총시수 ÷ 교사 수. 미배정·배정 보류·창체는 제외합니다. *는 입력분 기준 잠정 평균입니다. 미개설·0반은 생략합니다.',
     ...held.map(r=>{const a=M.assignmentStatus(r);return `† ${r.name}: ${r.sections}반 × ${r.hours}시간 = ${a.total}시간 / 기존 배정 ${a.requested}시간 보존, 평균 반영 보류.`;})
    ];
@@ -82,7 +83,7 @@
    chunks.forEach((departments,i)=>pages.push({year:y,term:t,area:name,part:i+1,parts:chunks.length,title:`${y}학년도 ${name} 주간수업 배당표`,
     subtitle:`${t}학기 · ${state.name} · 현재 조율안 · 단위: 시간/주, 반, 명`,
     classes:[1,2,3].map(g=>state.classes[y-g+1]),departments,stats,totals,gradeTotals,note,footnotes,
-    entries:departments.flatMap(b=>b.entries),hasWarnings:outstanding||unknown>0||held.length>0||checks.length>0}));
+    entries:departments.flatMap(b=>b.entries),hasWarnings:outstanding||unknown>0||held.length>0||fractional>0||checks.length>0}));
   }
   return {name:state.name,updatedAt:state.updatedAt||null,createdAt,hoursMode,widths,pages};
  }
@@ -91,14 +92,22 @@
   const labels=hoursMode==='total'?['교사<br>수','교과<br>총시수','교사 1인<br>평균']:['교사<br>수','자체<br>시수','배정<br>시수','교과<br>총시수','교사 1인<br>평균'];
   return `<thead><tr><th rowspan="2">담당<br>교과</th><th rowspan="2">구분</th><th rowspan="2">과목명</th>${p.classes.map((c,i)=>`<th colspan="3">${i+1}학년 (${c}학급)</th>`).join('')}${labels.map(s=>`<th rowspan="2">${s}</th>`).join('')}</tr><tr>${p.classes.map(()=>'<th>반당<br>시수</th><th>담당<br>반 수</th><th>교과<br>시수</th>').join('')}</tr></thead>`;
  }
- function render(report){
+ function editableCell(p,block,entry,col,value,editable){
+  if(!editable||![3,6,9].includes(col))return text(value);
+  const source=entry.sources.find(s=>s.grade===(col/3));
+  if(!source)return text(value);
+  const action=source.allocated?`data-assign="${esc(source.id)}" data-assign-dept="${esc(block.dept)}"`:`data-edit="${esc(source.id)}"`;
+  const label=`${p.year}학년도 ${p.term}학기 ${source.grade}학년 ${block.dept} ${entry.name} 담당 반 수 수정`;
+  return `<button class="report-edit-count" ${action} aria-label="${esc(label)}" title="담당 반 수 수정">${text(value)}</button><span class="report-print-count">${text(value)}</span>`;
+ }
+ function render(report,{editable=false}={}){
   return report.pages.map((p,index)=>`<article class="report-page grouped-page" aria-label="${esc(p.title)} ${p.term}학기 ${p.part}쪽">
    <div class="report-heading"><h2>${esc(p.title)}</h2><span>${p.term}학기 · ${p.part}/${p.parts}</span></div>
    <p class="report-subtitle">${esc(p.subtitle)}</p>
    <table class="report-grid"><colgroup>${report.widths.map(w=>`<col style="width:${w/277*100}%">`).join('')}</colgroup>${tableHead(p,report.hoursMode)}<tbody>
    ${p.departments.map(block=>block.entries.map((e,i)=>`<tr class="${i===0?'report-dept-start':''}" data-report-key="${esc(block.dept+'|'+e.key)}">
    ${i===0?`<th class="report-department" rowspan="${block.entries.length}">${text(label(block.dept))}${block.continued?'<br><small>계속</small>':''}</th>`:''}
-   ${e.cells.map((c,col)=>`<td class="${col===0?'report-kind':col===1?'report-course':(col-4)%3===0?'report-grade-hours':''}">${text(c)}</td>`).join('')}
+   ${e.cells.map((c,col)=>`<td class="${col===0?'report-kind':col===1?'report-course':[3,6,9].includes(col)?'report-section-count':(col-4)%3===0?'report-grade-hours':''}">${editableCell(p,block,e,col,c,editable)}</td>`).join('')}
    ${i===0?statCells(block.stats,report.hoursMode).map((v,col,values)=>`<td class="report-dept-stat ${col===values.length-1?'report-dept-average':''}" rowspan="${block.entries.length}">${text(v)}</td>`).join(''):''}</tr>`).join('')).join('')}
    <tr class="report-total"><th colspan="3">${p.area} 전체 · 학기 합계</th>${p.gradeTotals.map(n=>`<td></td><td></td><td>${fmt(n)}</td>`).join('')}${statCells(p.totals,report.hoursMode).map(n=>`<td>${text(n)}</td>`).join('')}</tr></tbody></table>
    <p class="report-status">${esc(p.note)}${p.parts>1?' · 교과별 수치는 해당 교과 전체, 마지막 학기 합계는 모든 쪽을 합친 값입니다.':''}</p>
