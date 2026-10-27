@@ -2,6 +2,21 @@
 .report-controls label{display:flex;align-items:center;gap:8px;font-weight:600}
 .report-controls p{width:100%;margin:0;font-size:.875rem;line-height:1.7}
 .report-controls .button{margin-left:auto}
+.report-department-picker{width:100%;min-width:0;border:1px solid #d7e2e7;border-radius:9px;padding:14px 16px;margin:0}
+.report-department-picker legend{padding:0 8px;font-weight:750;font-size:.95rem}
+.report-department-picker legend span{margin-left:8px;color:#087d74;font-size:.8rem;font-weight:600}
+.report-selection-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.report-selection-actions .button{margin-left:0}
+.report-choice-row{display:flex;align-items:flex-start;gap:12px;padding:7px 0;border-bottom:1px solid #eef2f4;font-size:.875rem}
+.report-choice-row>strong{min-width:76px;padding-top:5px}
+.report-choice-row>div{display:flex;flex-wrap:wrap;gap:6px 10px}
+.report-choice-row label{padding:5px 9px;border:1px solid #dde7e9;border-radius:5px;cursor:pointer;font-weight:500}
+.report-choice-row label:has(input:checked){border-color:#56a79a;background:#edf7f3;color:#075e54}
+.report-department-picker input[type=checkbox]{width:16px;height:16px;accent-color:#087d74;margin:0;flex-shrink:0}
+.report-department-picker .report-group-option{margin:14px 0 7px;font-size:.85rem;cursor:pointer}
+.report-department-picker p{font-size:.8rem;line-height:1.65;color:#536b78}
+.report-empty{padding:34px;text-align:center;color:#536b78}
+@media(max-width:640px){.report-department-picker{padding:12px}.report-choice-row{display:block}.report-choice-row>strong{display:block;margin-bottom:6px}.report-choice-row>div{gap:6px}.report-controls label{font-size:.85rem}}
 .report-preview{overflow:auto;padding:2px 2px 20px}
 .report-page{box-sizing:border-box;width:297mm;min-height:210mm;margin:0 auto 22px;padding:10mm;background:#fff;color:#111;box-shadow:0 2px 15px #18334020;font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:11pt;line-height:1.35}
 .report-page *{color:#111}

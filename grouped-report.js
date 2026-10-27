@@ -23,13 +23,26 @@
   const cells=d?[fmt(d.teachers),fmt(d.own),fmt(d.received),fmt(d.total),d.average===null?'미산정':fmt(d.average)+(d.partial?'*':'')]:['—','—','—','—','—'];
   return hoursMode==='total'?[cells[0],cells[3],cells[4]]:cells;
  }
- function build(state,{year=0,term=0,area='all',hoursMode='detail',createdAt=new Date().toISOString()}={}){
+ function printGroups(departments,groupAreas,area){
+  if(!Array.isArray(departments))return Object.keys(areas).filter(a=>area==='all'||a===area).map(name=>({name,depts:areas[name],category:categories[name]}));
+  const selected=M.TEACHING_DEPTS.filter(d=>departments.includes(d)),groups=[],seen=new Set();
+  for(const dept of selected){
+   const areaName=Object.keys(areas).find(a=>areas[a].includes(dept));
+   if(groupAreas&&areaName){
+    if(seen.has(areaName))continue;seen.add(areaName);
+    const depts=areas[areaName].filter(d=>selected.includes(d));
+    groups.push({name:depts.length===1?depts[0]:areaName,depts,category:depts.length===areas[areaName].length?categories[areaName]:null});
+   }else groups.push({name:dept,depts:[dept],category:null});
+  }
+  return groups;
+ }
+ function build(state,{year=0,term=0,area='all',departments=null,groupAreas=true,hoursMode='detail',createdAt=new Date().toISOString()}={}){
   hoursMode=hoursMode==='total'?'total':'detail';
   const widths=reportWidths(hoursMode);
   const pages=[];
-  for(const y of M.YEARS.filter(y=>!year||y===Number(year)))for(const t of [1,2].filter(t=>!term||t===Number(term)))for(const name of Object.keys(areas).filter(a=>area==='all'||a===area)){
-   const depts=areas[name],all=state.rows.filter(r=>r.year===y&&r.term===t);
-   const relevant=all.filter(r=>depts.includes(r.dept)||M.sharedCategory(r)===categories[name]||
+  for(const y of M.YEARS.filter(y=>!year||y===Number(year)))for(const t of [1,2].filter(t=>!term||t===Number(term)))for(const {name,depts,category:originCategory} of printGroups(departments,groupAreas,area)){
+   const all=state.rows.filter(r=>r.year===y&&r.term===t);
+   const relevant=all.filter(r=>depts.includes(r.dept)||(originCategory&&M.sharedCategory(r)===originCategory)||
     M.sharedCategory(r)&&(r.allocations||[]).some(a=>depts.includes(a.dept)));
    const shared=relevant.filter(r=>M.sharedCategory(r)),outstanding=shared.some(r=>{const a=M.assignmentStatus(r);return a.remaining===null||a.remaining>0||a.over;});
    const stats=M.teacherSummary(state,y).filter(d=>depts.includes(d.dept)).map(d=>{const v=d.terms[t-1];return {dept:d.dept,teachers:v.teachers,own:v.own,received:v.received,total:v.total,average:v.perTeacher,partial:!!(v.missing||v.pendingTransfers||outstanding)};});
@@ -48,7 +61,7 @@
     const a=M.assignmentStatus(r);
     for(const v of a.allocations)if(depts.includes(v.dept))add(r,v.dept,v.hours,true);
     // Only the originating area lists unresolved hours; cross-area recipients do not duplicate them.
-    if(category===categories[name]&&(a.remaining===null||a.remaining>0))add(r,'미배정',a.remaining,true,a.over);
+    if(originCategory&&category===originCategory&&(a.remaining===null||a.remaining>0))add(r,'미배정',a.remaining,true,a.over);
    }
    const blocks=[...buckets].map(([dept,map])=>({dept,stats:stats.find(d=>d.dept===dept)||null,entries:[...map.values()].sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'ko'))})).filter(b=>b.entries.length||b.stats);
    for(const block of blocks){
@@ -114,5 +127,5 @@
    <div class="report-footnotes">${p.footnotes.map(note=>`<p>${esc(note)}</p>`).join('')}</div>
    <div class="report-page-number"><span>시수 플래너 · ${esc(report.createdAt.slice(0,10))}</span><span>${index+1} / ${report.pages.length}</span></div></article>`).join('');
  }
- root.PrintReport={build,render,statCells,entryCells,tripleCells,widths,kind};
+ root.PrintReport={build,render,statCells,entryCells,tripleCells,widths,kind,printGroups};
 })(globalThis);
