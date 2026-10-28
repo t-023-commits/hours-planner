@@ -58,6 +58,7 @@
 @media screen{.report-page{zoom:var(--report-zoom,1)}}
 @page current-plan{size:A4 landscape;margin:10mm}
 @media print{
+ html:has(body[data-current-view="print"]){background:white}
  .report-edit-count{display:none!important}
  .report-print-count{display:inline!important}
  body[data-current-view="print"]{background:white;color:#111}

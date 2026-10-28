@@ -36,13 +36,16 @@
   }
   return groups;
  }
- function build(state,{year=0,term=0,area='all',departments=null,groupAreas=true,hoursMode='detail',createdAt=new Date().toISOString()}={}){
+ function build(state,{year=0,term=0,area='all',departments=null,groupAreas=true,pageLayout='continuous',hoursMode='detail',createdAt=new Date().toISOString()}={}){
   hoursMode=hoursMode==='total'?'total':'detail';
+  pageLayout=pageLayout==='separate'?'separate':'continuous';
   const widths=reportWidths(hoursMode);
+  let groups=printGroups(departments,pageLayout==='continuous'||groupAreas,area);
+  if(pageLayout==='continuous'&&groups.length>1)groups=[{name:'선택 교과',depts:groups.flatMap(g=>g.depts),categories:groups.map(g=>g.category).filter(Boolean)}];
   const pages=[];
-  for(const y of M.YEARS.filter(y=>!year||y===Number(year)))for(const t of [1,2].filter(t=>!term||t===Number(term)))for(const {name,depts,category:originCategory} of printGroups(departments,groupAreas,area)){
+  for(const y of M.YEARS.filter(y=>!year||y===Number(year)))for(const t of [1,2].filter(t=>!term||t===Number(term)))for(const {name,depts,category,categories:originCategories=category?[category]:[]} of groups){
    const all=state.rows.filter(r=>r.year===y&&r.term===t);
-   const relevant=all.filter(r=>depts.includes(r.dept)||(originCategory&&M.sharedCategory(r)===originCategory)||
+   const relevant=all.filter(r=>depts.includes(r.dept)||originCategories.includes(M.sharedCategory(r))||
     M.sharedCategory(r)&&(r.allocations||[]).some(a=>depts.includes(a.dept)));
    const shared=relevant.filter(r=>M.sharedCategory(r)),outstanding=shared.some(r=>{const a=M.assignmentStatus(r);return a.remaining===null||a.remaining>0||a.over;});
    const stats=M.teacherSummary(state,y).filter(d=>depts.includes(d.dept)).map(d=>{const v=d.terms[t-1];return {dept:d.dept,teachers:v.teachers,own:v.own,received:v.received,total:v.total,average:v.perTeacher,partial:!!(v.missing||v.pendingTransfers||outstanding)};});
@@ -61,7 +64,7 @@
     const a=M.assignmentStatus(r);
     for(const v of a.allocations)if(depts.includes(v.dept))add(r,v.dept,v.hours,true);
     // Only the originating area lists unresolved hours; cross-area recipients do not duplicate them.
-    if(originCategory&&category===originCategory&&(a.remaining===null||a.remaining>0))add(r,'미배정',a.remaining,true,a.over);
+    if(originCategories.includes(category)&&(a.remaining===null||a.remaining>0))add(r,'미배정',a.remaining,true,a.over);
    }
    const blocks=[...buckets].map(([dept,map])=>({dept,stats:stats.find(d=>d.dept===dept)||null,entries:[...map.values()].sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'ko'))})).filter(b=>b.entries.length||b.stats);
    for(const block of blocks){
@@ -83,7 +86,8 @@
    ];
    const chunks=[];let chunk=[],height=0;
    // Preserve department blocks whenever possible, and never shrink the 11 pt body text.
-   const budget=held.length?123:130;
+   // Leave room for the shared table header, totals, notes and page number on A4.
+   const budget=pageLayout==='continuous'?Math.max(60,120-held.length*7):(held.length?123:130);
    for(const block of blocks){
     const blockHeight=Math.max(16,block.entries.reduce((n,e)=>n+e.height,0));
     if(height+blockHeight>budget&&chunk.length){chunks.push(chunk);chunk=[];height=0;}
@@ -98,7 +102,7 @@
     classes:[1,2,3].map(g=>state.classes[y-g+1]),departments,stats,totals,gradeTotals,note,footnotes,
     entries:departments.flatMap(b=>b.entries),hasWarnings:outstanding||unknown>0||held.length>0||fractional>0||checks.length>0}));
   }
-  return {name:state.name,updatedAt:state.updatedAt||null,createdAt,hoursMode,widths,pages};
+  return {name:state.name,updatedAt:state.updatedAt||null,createdAt,pageLayout,hoursMode,widths,pages};
  }
  const text=s=>esc(s).replaceAll('\n','<br>');
  function tableHead(p,hoursMode){
