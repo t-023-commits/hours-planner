@@ -77,7 +77,8 @@
    const e=map.get(key);
    if(p.row.groupId)e.groups.add(p.row.groupId);
    const i=p.row.grade-1;
-   if(!e.cells[i])e.cells[i]={rowId:p.row.id,dept:p.dept,unit:p.row.hours,pool:!!p.pool,held:!!p.held,required:p.row.required,now:null,old:null};
+   if(!e.cells[i])e.cells[i]={rowId:p.row.id,dept:p.dept,unit:p.row.hours,pool:!!p.pool,held:!!p.held,required:p.row.required,
+    applicants:p.row.required?null:demand.get(p.row.id)??null,now:null,old:null};
    return e.cells[i];
   }
   for(const p of portions(base,year,term))cell(p).old={sections:p.sections,hours:p.hours,per:perSection(base,p.row,demand)};
@@ -213,7 +214,7 @@
    if(ui.groupId&&!list.some(g=>g.id===ui.groupId))ui.groupId=null;
    return {s,y,list};
   }
-  function was(show,text){return show?`<small class="cs-was">원래 ${text}</small>`:'';}
+  function was(show,text){return show?`<small class="cs-was">기존 ${text}</small>`:'';}
   function countCell(c){
    if(!c.editable)return `${f(c.now.sections)}${was(c.changed,f(c.old.sections))}`;
    const label=`${esc(c.dept)} 담당 반 수`;
@@ -221,7 +222,7 @@
   }
   function gradeCells(c){
    if(!c)return '<td class="cs-g"></td><td></td><td></td><td></td>';
-   return `<td class="cs-g num">${f(c.unit)}</td><td class="center cs-count${c.changed?' cs-diff':''}">${countCell(c)}</td><td class="num cs-per${c.perChanged?' cs-diff':''}">${n1(c.now.per)}${was(c.perChanged,n1(c.old.per))}</td><td class="num${c.changed?' cs-diff':''}">${f(c.now.hours)}${was(c.changed,f(c.old.hours))}</td>`;
+   return `<td class="cs-g num">${f(c.unit)}</td><td class="center cs-count${c.changed?' cs-diff':''}">${countCell(c)}</td><td class="num cs-per${c.perChanged?' cs-diff':''}">${n1(c.now.per)}${c.applicants!==null?` <span class="cs-n">(${Math.round(c.applicants)})</span>`:''}${was(c.perChanged,n1(c.old.per))}</td><td class="num${c.changed?' cs-diff':''}">${f(c.now.hours)}${was(c.changed,f(c.old.hours))}</td>`;
   }
   function statCells(b,rows){
    if(b.pool||!b.now)return `<td class="cs-stat" rowspan="${rows}" colspan="5">미배정 · 공통·교양 시수 배정에서 담당 교과 지정</td>`;
@@ -233,7 +234,7 @@
    const sel=ui.groupId;
    const blocks=ui.focus&&sel?t.blocks.filter(b=>b.entries.some(e=>e.groups.has(sel))):t.blocks;
    return `<div class="table-scroll cs-sheet-scroll"><table class="cs-sheet"><thead><tr><th rowspan="2">담당<br>교과</th><th rowspan="2">구분</th><th rowspan="2" class="cs-name">과목명</th>${t.grades.map(g=>`<th colspan="4" class="cs-g">${g.grade}학년 (${g.classes}학급${g.students?` · ${g.students}명`:''})</th>`).join('')}<th rowspan="2" class="cs-stat">교사<br>수</th><th rowspan="2">자체<br>시수</th><th rowspan="2">배정<br>시수</th><th rowspan="2">교과<br>총시수</th><th rowspan="2">교사 1인<br>평균</th></tr>
-    <tr>${t.grades.map(()=>'<th class="cs-g">반당<br>시수</th><th>담당<br>반 수</th><th>반당<br>인원</th><th>교과<br>시수</th>').join('')}</tr></thead><tbody>
+    <tr>${t.grades.map(()=>'<th class="cs-g">반당<br>시수</th><th>담당<br>반 수</th><th>반당 인원<br>(선택 인원)</th><th>교과<br>시수</th>').join('')}</tr></thead><tbody>
     ${blocks.map(b=>b.entries.map((e,i)=>`<tr class="${i===0?'cs-dept-start':''}${sel&&e.groups.has(sel)?' cs-in-group':''}">${i===0?`<th class="cs-dept" rowspan="${b.entries.length}">${deptLabel(b.dept)}${b.pool?'<small>미배정</small>':''}</th>`:''}<td class="cs-kind">${esc(e.kind)}</td><td class="cs-name">${esc(e.name)}</td>${e.cells.map(gradeCells).join('')}${i===0?statCells(b,b.entries.length):''}</tr>`).join('')).join('')||'<tr><td colspan="20" class="cs-empty">표시할 과목이 없습니다.</td></tr>'}
     <tr class="cs-total"><th colspan="3">${y}학년도 ${ui.term}학기 합계</th>${t.grades.map(g=>`<td class="cs-g" colspan="3"></td><td class="num${g.now!==g.old?' cs-diff':''}"><b>${f(g.now)}</b>${was(g.now!==g.old,f(g.old))}</td>`).join('')}<td colspan="3"></td><td class="num${t.total.now!==t.total.old?' cs-diff':''}"><b>${f(t.total.now)}</b>${was(t.total.now!==t.total.old,f(t.total.old))}</td><td></td></tr>
    </tbody></table></div>`;
@@ -242,9 +243,9 @@
    const g=list.find(x=>x.id===ui.groupId);
    if(!g)return `<p class="cs-hint">선택군을 고르면 목표 반 수를 −/＋로 한 번에 줄이거나 늘릴 수 있습니다. 표의 담당 반 수를 직접 바꿀 수도 있습니다.</p>`;
    const now=CS.groupSummary(draft,y,g.id,demand),old=CS.groupSummary(s,y,g.id,demand),cohort=y-g.grade+1,base=M.baseGroupTarget(draft,y,g);
-   const stat=(label,a,b,fmt,unit)=>`<div class="cs-gp-stat${a!==b?' cs-diff':''}"><span>${label}</span><b>${fmt(a)}${a===null?'':unit}</b>${a!==b?`<small>원래 ${fmt(b)}${b===null?'':unit}</small>`:'<small>&nbsp;</small>'}</div>`;
+   const stat=(label,a,b,fmt,unit)=>`<div class="cs-gp-stat${a!==b?' cs-diff':''}"><span>${label}</span><b>${fmt(a)}${a===null?'':unit}</b>${a!==b?`<small>기존 ${fmt(b)}${b===null?'':unit}</small>`:'<small>&nbsp;</small>'}</div>`;
    return `<section class="cs-group-panel"><div class="cs-gp-title"><b>${g.grade}학년 ${g.term}학기 · 선택군 ${esc(g.code)} · 택${g.picks}</b><span>${cohort} 입학생${CS.cohortStudents(draft,cohort)?` ${CS.cohortStudents(draft,cohort)}명`:''} · ${draft.classes[cohort]}학급 · 기준 ${draft.classes[cohort]}학급 × 택${g.picks} = ${base}반</span></div>
-    <div class="cs-gp-target"><span>목표 반 수</span><div class="stepper"><button data-cs-group-step="-1" data-cs-focus="group-minus" aria-label="목표 반 수 1 줄이기" ${now.total>1?'':'disabled'}>−</button><input type="number" min="1" max="300" step="1" value="${now.total}" data-cs-group-total="1" data-cs-focus="group-total" aria-label="선택군 목표 반 수"><button data-cs-group-step="1" data-cs-focus="group-plus" aria-label="목표 반 수 1 늘리기">＋</button></div><small>${now.total!==old.total?`원래 ${old.total}반 · `:''}블록당 ${n1(now.total/g.picks)}반</small></div>
+    <div class="cs-gp-target"><span>목표 반 수</span><div class="stepper"><button data-cs-group-step="-1" data-cs-focus="group-minus" aria-label="목표 반 수 1 줄이기" ${now.total>1?'':'disabled'}>−</button><input type="number" min="1" max="300" step="1" value="${now.total}" data-cs-group-total="1" data-cs-focus="group-total" aria-label="선택군 목표 반 수"><button data-cs-group-step="1" data-cs-focus="group-plus" aria-label="목표 반 수 1 늘리기">＋</button></div><small>${now.total!==old.total?`기존 ${old.total}반 · `:''}블록당 ${n1(now.total/g.picks)}반</small></div>
     ${stat('반당 평균 인원',now.average,old.average,n1,'명')}${stat('가장 큰 반',now.max,old.max,n1,'명')}${stat('선택군 시수',now.hours,old.hours,f,'시간')}
     <p class="cs-gp-help">−는 줄여도 반당 인원이 가장 적게 늘어나는 과목에서, ＋는 반당 인원이 가장 많은 과목에 1반씩 바꿉니다. 0반·미개설 과목은 건드리지 않습니다.</p></section>`;
   }
@@ -259,9 +260,9 @@
      <span class="cs-students">학생 수 ${t.grades.map(g=>`<label>${g.grade}학년 <input type="number" min="1" max="2000" step="1" placeholder="미정" value="${g.students??''}" data-cs-students="${g.cohort}" data-cs-focus="st-${g.cohort}" aria-label="${g.grade}학년(${g.cohort} 입학생) 학생 수">명</label>`).join('')}</span></div>`+
     groupPanel(s,y,list,demand)+
     `<div class="cs-applybar${all.length?' has-changes':''}" role="status"><span>${y}학년도 ${ui.term}학기 교과 시수 합계 <b>${f(t.total.old)} → ${f(t.total.now)}</b>시간 <b class="${tone(diff)}">(${signed(diff)})</b> · 바뀐 과목 ${here}개${all.length>here?` · 다른 학기·학년도 포함 ${all.length}개`:''}</span>
-     <div class="actions"><button class="button small" data-cs-reset="1" ${all.length?'':'disabled'}>원래대로</button><button class="button primary small" data-cs-apply="1" ${all.length?'':'disabled'}>예상안에 적용</button></div></div>`+
+     <div class="actions"><button class="button small" data-cs-reset="1" ${all.length?'':'disabled'}>기존값으로</button><button class="button primary small" data-cs-apply="1" ${all.length?'':'disabled'}>예상안에 적용</button></div></div>`+
     sheet(t,y)+
-    `<p class="cs-foot">반당 인원 = 예상 신청 인원 ÷ 반 수(학교 지정 과목은 학생 수 ÷ 학급 수). 신청 인원은 선택자료, 없으면 참고 추정·과거 선택 환산을 쓰고, 학년 학생 수를 입력하면 ‘학생 수 × 택N’에 맞춰 환산합니다. 공통·융합 과목의 반을 줄이면 해당 교과의 배정이 함께 줄어듭니다. 학교 지정 과목은 학급 수로 정해지므로 ‘계산 기준·자료’에서 학급 수를 바꿉니다.</p>`;
+    `<p class="cs-foot">반당 인원 = 예상 선택 인원 ÷ 반 수이며, 선택과목은 괄호 안에 과목 전체 선택 인원을 함께 표시합니다(학교 지정 과목은 학생 수 ÷ 학급 수). 신청 인원은 선택자료, 없으면 참고 추정·과거 선택 환산을 쓰고, 학년 학생 수를 입력하면 ‘학생 수 × 택N’에 맞춰 환산합니다. 공통·융합 과목의 반을 줄이면 해당 교과의 배정이 함께 줄어듭니다. 학교 지정 과목은 학급 수로 정해지므로 ‘계산 기준·자료’에서 학급 수를 바꿉니다.</p>`;
   }
   function edit(fn){
    try{fn();dirty=true;}catch(e){toast(e.message);}
@@ -298,7 +299,7 @@
     const cur=CS.portionCount(draft,d.csRow,d.csDept);
     edit(()=>CS.setPortion(draft,d.csRow,d.csDept,Math.max(0,cur+Number(d.csStep))));redraw(d.csFocus);return;
    }
-   if(d.csReset){draft=M.clone(getState());dirty=false;render();toast('시뮬레이션을 현재 예상안으로 되돌렸습니다.');return;}
+   if(d.csReset){draft=M.clone(getState());dirty=false;render();toast('시뮬레이션을 기존 예상안으로 되돌렸습니다.');return;}
    if(d.csApply)apply();
   });
   document.addEventListener('change',e=>{
