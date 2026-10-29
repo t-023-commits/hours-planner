@@ -24,7 +24,7 @@
    const original=new Map(getState().rows.map(r=>[r.id,r]));
    openDialog(`선택군 ${esc(g.code)} · 개설 반 수 함께 조정`,
     `${selected.year}학년도 · ${selected.grade}학년 ${selected.term}학기 · ${selected.cohort} 입학생`,
-    `<div class="group-target"><span>${draft.classes}학급 × 택${g.picks}</span><strong>목표 ${draft.target}반</strong></div>
+    `<div class="group-target"><span>${draft.classes}학급 × 택${g.picks}${Number.isInteger(draft.base)&&draft.base!==draft.target?` = 기준 ${draft.base}반 · 반편성 시뮬레이션에서 조정`:''}</span><strong>목표 ${draft.target}반</strong></div>
     <p class="group-explanation"><b>${esc(selected.name)}</b>에 입력한 반 수는 유지하고, 나머지 개설 과목은 현재 반 수 비율로 정수 배분합니다. 0반·미개설 과목은 자동으로 늘리지 않습니다. 아래 숫자를 직접 조정할 수도 있습니다.</p>
     <div class="draft-actions"><button class="button small" data-group-action="rebalance">나머지 반 수 자동 맞추기</button><span>직접 조정 후에는 합계를 목표 반 수에 맞춰 주세요.</span></div>
     <form id="group-sections-form"><div class="table-scroll group-draft-scroll"><table class="group-draft-table"><thead><tr><th>교과 · 과목</th><th class="num">현재 반 수</th><th class="center">변경 반 수</th><th class="num">증감</th><th class="num">변경 후 주당시수</th></tr></thead><tbody>${draft.rows.map(r=>{

@@ -2,6 +2,7 @@
   'use strict';
   const D = root.CURRICULUM_DATA;
   const YEARS = [2027, 2028, 2029];
+  const COHORTS = [2025, 2026, 2027, 2028, 2029];
   const clone = x => JSON.parse(JSON.stringify(x));
   const num = x => typeof x === 'number' && Number.isFinite(x);
   const round = x => Math.round(x * 100) / 100;
@@ -12,6 +13,7 @@
   // They are never shared identifiers across different admission cohorts.
   const labeledGroups=D.groups.map(g=>({...g,code:String.fromCharCode(65+D.groups.filter(x=>x.cohort===g.cohort).findIndex(x=>x.id===g.id))}));
   function selectionGroup(row){return labeledGroups.find(g=>g.id===row.groupId)||null;}
+  function findGroup(group){return typeof group==='string'?labeledGroups.find(g=>g.id===group)||null:group||null;}
   function selectionLabel(row,full=false){
     if(row.required)return '학교 지정';
     const g=selectionGroup(row);
@@ -22,6 +24,44 @@
     return [1,2,3].filter(g=>!grade||g===grade).flatMap(g=>labeledGroups.filter(x=>x.cohort===Math.min(year-g+1,2027)&&x.grade===g&&(!term||x.term===term))).sort((a,b)=>a.grade-b.grade||a.term-b.term||a.code.localeCompare(b.code));
   }
   function matchesGroup(row,key){return key==='all'||key==='required'&&row.required||key==='ungrouped'&&!row.required&&!row.groupId||row.groupId===key;}
+  // A selection group's total sections. The default is classes × picks (예: 13학급 × 택3 = 39반).
+  // The class-scenario page may store a different total per year and group (예: 36반) to test larger moving classes.
+  const groupKey=(year,groupId)=>`${year}:${groupId}`;
+  function baseGroupTarget(state,year,group){
+    const g=findGroup(group);
+    if(!g)return null;
+    return g.picks*state.classes[year-g.grade+1];
+  }
+  function groupTarget(state,year,group){
+    const g=findGroup(group);
+    if(!g)return null;
+    const stored=state.groupTargets?.[groupKey(year,g.id)];
+    return Number.isInteger(stored)?stored:baseGroupTarget(state,year,g);
+  }
+  function setGroupTarget(state,year,groupId,total){
+    const g=findGroup(groupId);
+    if(!YEARS.includes(year)||!g||g.cohort!==Math.min(year-g.grade+1,2027))throw new Error('목표 반 수를 바꿀 학년도와 선택군을 확인해 주세요.');
+    if(total!==null&&(!Number.isInteger(total)||total<1||total>300))throw new Error('선택군 목표 반 수는 1~300 사이의 정수여야 합니다.');
+    if(!state.groupTargets)state.groupTargets={};
+    const key=groupKey(year,g.id);
+    if(total===null||total===baseGroupTarget(state,year,g))delete state.groupTargets[key];
+    else state.groupTargets[key]=total;
+  }
+  // Grade size = applications in a fully recorded selection block ÷ picks (과목별 선택인원 2026.9.28.).
+  // 2025 입학생 239명, 2026 입학생 267명. Later cohorts have no data and stay blank (미정).
+  function defaultCohortStudents(){
+    const out=Object.fromEntries(COHORTS.map(c=>[c,null]));
+    for(const cohort of COHORTS){
+      for(const g of D.groups.filter(g=>g.cohort===cohort)){
+        const rows=D.curriculum.filter(r=>r.groupId===g.id);
+        const found=rows.map(r=>D.choices.find(x=>x.cohort===cohort&&x.grade===r.grade&&x.term===r.term&&x.name===r.name));
+        if(!rows.length||found.some(x=>!x||!num(x.students)))continue;
+        const n=found.reduce((s,x)=>s+x.students,0)/g.picks;
+        if(Number.isInteger(n)&&n>0){out[cohort]=n;break;}
+      }
+    }
+    return out;
+  }
   function defaultTeacherCounts(){
     return Object.fromEntries(YEARS.map(y=>[y,Object.fromEntries(D.departments.map(d=>{const n=D.teacherReference.find(x=>x.dept===d)?.count??null;return [d,[n,n]];}))]));
   }
@@ -200,7 +240,7 @@
     return same.sort((a,b) => ((b.grade === row.grade ? 4 : 0)+(b.term === row.term ? 2 : 0)) - ((a.grade === row.grade ? 4 : 0)+(a.term === row.term ? 2 : 0)) || b.cohort-a.cohort)[0] || null;
   }
   function defaultState() {
-    const state = {schema:1, name:'기본 예상안', classes:{2025:13,2026:13,2027:12,2028:12,2029:12}, classSize:23, weeks:[17,17], teacherCounts:defaultTeacherCounts(), rows:[], updatedAt:null};
+    const state = {schema:1, name:'기본 예상안', classes:{2025:13,2026:13,2027:12,2028:12,2029:12}, classSize:23, weeks:[17,17], teacherCounts:defaultTeacherCounts(), groupTargets:{}, cohortStudents:defaultCohortStudents(), rows:[], updatedAt:null};
     for (const year of YEARS) {
       for (const grade of [1,2,3]) {
         const cohort = year-grade+1;
@@ -279,7 +319,7 @@
     if(!group)throw new Error('반 수를 함께 조정할 선택군이 없습니다.');
     const rows=clone(groupRows(state,row)),edited=rows.find(r=>r.id===id);
     for(const field of EDIT_FIELDS)if(Object.hasOwn(patch,field))edited[field]=patch[field];
-    return balanceGroupSections({id,group:clone(group),classes:state.classes[row.cohort],target:group.picks*state.classes[row.cohort],rows,weights:Object.fromEntries(rows.map(r=>[r.id,r.sections])),note:''});
+    return balanceGroupSections({id,group:clone(group),classes:state.classes[row.cohort],base:baseGroupTarget(state,row.year,group),target:groupTarget(state,row.year,group),rows,weights:Object.fromEntries(rows.map(r=>[r.id,r.sections])),note:''});
   }
   function groupSectionStatus(plan){
     const active=plan.rows.filter(r=>r.enabled),unknown=active.filter(r=>r.sections===null).length;
@@ -316,7 +356,7 @@
   }
   function applyGroupSections(state,plan){
     const row=state.rows.find(r=>r.id===plan.id),group=row&&selectionGroup(row);
-    if(!group||plan.target!==group.picks*state.classes[row.cohort])throw new Error('선택군 또는 학급 수가 바뀌었습니다. 다시 조정해 주세요.');
+    if(!group||plan.target!==groupTarget(state,row.year,group))throw new Error('선택군 또는 학급 수·목표 반 수가 바뀌었습니다. 다시 조정해 주세요.');
     const expected=groupRows(state,row),ids=new Set(plan.rows.map(r=>r.id));
     if(ids.size!==plan.rows.length||expected.length!==plan.rows.length||expected.some(r=>!ids.has(r.id)))throw new Error('같은 학년도·학년·학기의 선택군만 함께 조정할 수 있습니다.');
     const status=groupSectionStatus(plan);
@@ -344,7 +384,7 @@
     const plans=[];
     for(const row of groups.values()){
       const group=selectionGroup(row);
-      const plan=balanceGroupSections({id:row.id,fixedId:null,group:clone(group),classes:next.classes[row.cohort],target:group.picks*next.classes[row.cohort],rows:clone(groupRows(next,row)),note:''});
+      const plan=balanceGroupSections({id:row.id,fixedId:null,group:clone(group),classes:next.classes[row.cohort],base:baseGroupTarget(next,row.year,group),target:groupTarget(next,row.year,group),rows:clone(groupRows(next,row)),note:''});
       plans.push(plan);
       for(const draft of plan.rows)next.rows.find(r=>r.id===draft.id).sections=draft.sections;
     }
@@ -361,8 +401,8 @@
         if(!rr.length)continue;
         const unknown=rr.filter(r=>r.enabled&&r.sections===null).length;
         const actual=rr.reduce((s,r)=>s+(r.enabled?r.sections??0:0),0);
-        const target=g.picks*state.classes[cohort];
-        checks.push({grade,term:g.term,picks:g.picks,code:selectionGroup(rr[0]).code,actual,target,unknown,names:rr.map(r=>r.name),id:g.id});
+        const base=g.picks*state.classes[cohort],target=groupTarget(state,year,g.id);
+        checks.push({grade,term:g.term,picks:g.picks,code:selectionGroup(rr[0]).code,actual,target,base,override:target!==base,unknown,names:rr.map(r=>r.name),id:g.id});
       }
     }
     return checks;
@@ -370,7 +410,7 @@
   function validateState(value) {
     if(!value || value.schema!==1 || !Array.isArray(value.rows) || value.rows.length>3000)throw new Error('이 사이트에서 저장한 예상안 JSON 파일을 선택해 주세요.');
     if(typeof value.name!=='string'||value.name.length>80)throw new Error('예상안 이름을 확인해 주세요.');
-    for(const c of [2025,2026,2027,2028,2029])if(!Number.isInteger(value.classes?.[c])||value.classes[c]<1||value.classes[c]>50)throw new Error('입학 연도별 학급 수는 1~50이어야 합니다.');
+    for(const c of COHORTS)if(!Number.isInteger(value.classes?.[c])||value.classes[c]<1||value.classes[c]>50)throw new Error('입학 연도별 학급 수는 1~50이어야 합니다.');
     if(!num(value.classSize)||value.classSize<1||value.classSize>100)throw new Error('반당 기준 인원을 확인해 주세요.');
     if(!Array.isArray(value.weeks)||value.weeks.length!==2||value.weeks.some(n=>!num(n)||n<1||n>30))throw new Error('학기별 수업 주 수를 확인해 주세요.');
     // Upgrade old backups without replacing any existing course edits.
@@ -379,6 +419,22 @@
     for(const year of YEARS)for(const dept of D.departments){
       const counts=value.teacherCounts?.[year]?.[dept];
       if(!Array.isArray(counts)||counts.length!==2||counts.some(n=>n!==null&&(!Number.isInteger(n)||n<0||n>100)))throw new Error('교과별 교사 수는 학기별 0~100명 또는 미정이어야 합니다.');
+    }
+    // Earlier plans have no adjusted selection-group totals or grade sizes.
+    if(value.groupTargets===undefined||value.groupTargets===null)value.groupTargets={};
+    if(typeof value.groupTargets!=='object'||Array.isArray(value.groupTargets))throw new Error('선택군 목표 반 수 자료를 확인해 주세요.');
+    for(const [key,total] of Object.entries(value.groupTargets)){
+      const [y,id]=key.split(':'),g=findGroup(id),year=Number(y);
+      if(!YEARS.includes(year)||!g||g.cohort!==Math.min(year-g.grade+1,2027))throw new Error('선택군 목표 반 수의 학년도·선택군을 확인해 주세요.');
+      if(!Number.isInteger(total)||total<1||total>300)throw new Error('선택군 목표 반 수는 1~300 사이의 정수여야 합니다.');
+    }
+    const students=defaultCohortStudents();
+    if(value.cohortStudents===undefined||value.cohortStudents===null)value.cohortStudents=students;
+    if(typeof value.cohortStudents!=='object'||Array.isArray(value.cohortStudents))throw new Error('학년별 학생 수 자료를 확인해 주세요.');
+    for(const c of COHORTS){
+      if(value.cohortStudents[c]===undefined)value.cohortStudents[c]=students[c];
+      const n=value.cohortStudents[c];
+      if(n!==null&&(!Number.isInteger(n)||n<1||n>2000))throw new Error('학년별 학생 수는 1~2000명 또는 미정이어야 합니다.');
     }
     const ids=new Set(), courseKeys=new Set();
     for(const r of value.rows){
@@ -418,5 +474,5 @@
     return '"'+s.replaceAll('"','""')+'"';
   }
   function csv(matrix) {return '\ufeff'+matrix.map(row=>row.map(csvCell).join(',')).join('\r\n');}
-  root.Planner={YEARS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,integerAllocationPlan,allocationSectionStep,assignedSections,needsWholeSections,sectionEntries,setAllocationSections,suggestSectionAllocations,wholeSectionAllocationPlan,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan};
+  root.Planner={YEARS,COHORTS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,integerAllocationPlan,allocationSectionStep,assignedSections,needsWholeSections,sectionEntries,setAllocationSections,suggestSectionAllocations,wholeSectionAllocationPlan,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan,groupKey,groupTarget,baseGroupTarget,setGroupTarget,defaultCohortStudents};
 })(globalThis);

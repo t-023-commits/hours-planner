@@ -117,7 +117,8 @@
    const rows=before.rows.filter(r=>r.year===g.year&&r.grade===g.grade&&r.term===g.term&&M.selectionGroup(r)?.code===g.code);
    if(rows.some(r=>r.edited)){for(const r of rows){const target=s.rows.find(x=>x.id===r.id);target.sections=r.sections;}continue;}
    const weights=rows.map(r=>({name:r.name,weight:r.projection?.weight??r.sections??1}));
-   for(const item of distribute(weights,n*g.picks))s.rows.find(r=>r.year===g.year&&r.grade===g.grade&&r.term===g.term&&r.name===item.name).sections=item.sections;
+   // A stored target from the class-scenario page (예: 39반 → 36반) is kept when class counts change.
+   for(const item of distribute(weights,M.groupTarget(s,g.year,rows[0].groupId)))s.rows.find(r=>r.year===g.year&&r.grade===g.grade&&r.term===g.term&&r.name===item.name).sections=item.sections;
   }
  };
  root.PlanningUpdates={latestState,distribute,groupDefinition,demandFor,referenceText,projectionText,allocateRelated,areas};
