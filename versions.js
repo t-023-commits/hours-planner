@@ -2,7 +2,7 @@
  'use strict';
  // 사이트를 새로 배포할 때마다 이 값을 올립니다. 값이 바뀌면 처음 열 때 초기값으로 시작하고,
  // 그 전 작업은 '버전 열기'에 자동 보관합니다.
- const SITE_VERSION='2026-10-30.1';
+ const SITE_VERSION='2026-10-30.2';
  const VERSIONS_KEY='curriculum-hours-planner-versions-v1',SITE_KEY='curriculum-hours-planner-site';
  root.createVersionUI=function({M,esc,getState,transact,persist,render,openDialog,closeDialog,toast,download}){
   let initial=null,versions=null;

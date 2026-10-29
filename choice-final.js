@@ -1,5 +1,6 @@
 /* 과목별 선택인원(2026.10.28.) 최종 자료. 2027학년도 2학년(2026 입학생 274명)·3학년(2025 입학생 243명) 선택과목.
-   first = 처음 인원(E열), change = 수정 기간 증감(V열), students = 최종 인원(W열), sections = 최종 개설반(X열). */
+   first = 처음 인원(E열), change = 수정 기간 증감(V열), students = 최종 인원(W열), sections = 최종 개설반(X열).
+   fileSections가 있는 과목은 학교 초기 편성으로 개설반을 고친 값입니다(2학년 일본어·일본 문화: 파일 10반 → 11반, 중국어·중국 문화 2반과 합해 13반). */
 globalThis.CHOICE_FINAL = {
  version:'2026-10-28',
  label:'과목별 선택인원(2026.10.28.)',
@@ -16,7 +17,7 @@ globalThis.CHOICE_FINAL = {
   {"cohort":2026,"grade":2,"term":1,"name":"물리학","first":111,"change":-9,"students":102,"sections":5},
   {"cohort":2026,"grade":2,"term":1,"name":"화학","first":120,"change":1,"students":121,"sections":6},
   {"cohort":2026,"grade":2,"term":1,"name":"지구과학","first":96,"change":0,"students":96,"sections":5},
-  {"cohort":2026,"grade":2,"term":1,"name":"일본어","first":202,"change":22,"students":224,"sections":10},
+  {"cohort":2026,"grade":2,"term":1,"name":"일본어","first":202,"change":22,"students":224,"sections":11,"fileSections":10},
   {"cohort":2026,"grade":2,"term":1,"name":"중국어","first":68,"change":-18,"students":50,"sections":2},
   {"cohort":2026,"grade":2,"term":2,"name":"한국지리 탐구","first":51,"change":-5,"students":46,"sections":2},
   {"cohort":2026,"grade":2,"term":2,"name":"윤리와 사상","first":157,"change":26,"students":183,"sections":9},
@@ -27,7 +28,7 @@ globalThis.CHOICE_FINAL = {
   {"cohort":2026,"grade":2,"term":2,"name":"역학과 에너지","first":97,"change":-11,"students":86,"sections":4},
   {"cohort":2026,"grade":2,"term":2,"name":"생물의 유전","first":97,"change":-1,"students":96,"sections":5},
   {"cohort":2026,"grade":2,"term":2,"name":"행성우주과학","first":25,"change":-2,"students":23,"sections":1},
-  {"cohort":2026,"grade":2,"term":2,"name":"일본 문화","first":202,"change":22,"students":224,"sections":10},
+  {"cohort":2026,"grade":2,"term":2,"name":"일본 문화","first":202,"change":22,"students":224,"sections":11,"fileSections":10},
   {"cohort":2026,"grade":2,"term":2,"name":"중국 문화","first":68,"change":-18,"students":50,"sections":2},
   {"cohort":2025,"grade":3,"term":1,"name":"문학과 영상","first":122,"change":6,"students":128,"sections":7},
   {"cohort":2025,"grade":3,"term":1,"name":"미적분Ⅱ","first":118,"change":-3,"students":115,"sections":6},
