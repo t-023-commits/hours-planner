@@ -36,7 +36,8 @@
   }
   return groups;
  }
- function build(state,{year=0,term=0,area='all',departments=null,groupAreas=true,pageLayout='continuous',hoursMode='detail',createdAt=new Date().toISOString()}={}){
+ // baseline: 비교할 초기값 예상안(달라진 칸 음영), version: 인쇄물에 표시할 버전 이름
+ function build(state,{year=0,term=0,area='all',departments=null,groupAreas=true,pageLayout='continuous',hoursMode='detail',baseline=null,version='',createdAt=new Date().toISOString()}={}){
   hoursMode=hoursMode==='total'?'total':'detail';
   pageLayout=pageLayout==='separate'?'separate':'continuous';
   const widths=reportWidths(hoursMode);
@@ -44,32 +45,56 @@
   if(pageLayout==='continuous'&&groups.length>1)groups=[{name:'선택 교과',depts:groups.flatMap(g=>g.depts),categories:groups.map(g=>g.category).filter(Boolean)}];
   const pages=[];
   for(const y of M.YEARS.filter(y=>!year||y===Number(year)))for(const t of [1,2].filter(t=>!term||t===Number(term)))for(const {name,depts,category,categories:originCategories=category?[category]:[]} of groups){
-   const all=state.rows.filter(r=>r.year===y&&r.term===t);
-   const relevant=all.filter(r=>depts.includes(r.dept)||originCategories.includes(M.sharedCategory(r))||
-    M.sharedCategory(r)&&(r.allocations||[]).some(a=>depts.includes(a.dept)));
-   const shared=relevant.filter(r=>M.sharedCategory(r)),outstanding=shared.some(r=>{const a=M.assignmentStatus(r);return a.remaining===null||a.remaining>0||a.over;});
-   const stats=M.teacherSummary(state,y).filter(d=>depts.includes(d.dept)).map(d=>{const v=d.terms[t-1];return {dept:d.dept,teachers:v.teachers,own:v.own,received:v.received,total:v.total,average:v.perTeacher,partial:!!(v.missing||v.pendingTransfers||outstanding)};});
-   const buckets=new Map([...depts,'미배정'].map(d=>[d,new Map()]));
-   function add(r,dept,hours,allocated=false,held=false){
-    if(hours===0)return;
-    const key=[r.name,kind(r),held?'held':''].join('|'),map=buckets.get(dept);
-    if(!map.has(key))map.set(key,{key,kind:kind(r),name:r.name+(held?' †':''),triples:[null,null,null],sources:[],order:r.sourceRow??999});
-    const entry=map.get(key),sections=allocated?(hours===null||!r.hours?null:hours/r.hours):r.sections;
-    entry.triples[r.grade-1]={unit:r.hours,sections,hours,sourceSections:r.sections,allocated};
-    entry.sources.push({id:r.id,dept,grade:r.grade,hours,sections,allocated});
+   function collect(st){
+    const all=st.rows.filter(r=>r.year===y&&r.term===t);
+    const relevant=all.filter(r=>depts.includes(r.dept)||originCategories.includes(M.sharedCategory(r))||
+     M.sharedCategory(r)&&(r.allocations||[]).some(a=>depts.includes(a.dept)));
+    const shared=relevant.filter(r=>M.sharedCategory(r)),outstanding=shared.some(r=>{const a=M.assignmentStatus(r);return a.remaining===null||a.remaining>0||a.over;});
+    const stats=M.teacherSummary(st,y).filter(d=>depts.includes(d.dept)).map(d=>{const v=d.terms[t-1];return {dept:d.dept,teachers:v.teachers,own:v.own,received:v.received,total:v.total,average:v.perTeacher,partial:!!(v.missing||v.pendingTransfers||outstanding)};});
+    const buckets=new Map([...depts,'미배정'].map(d=>[d,new Map()]));
+    // Expected applicants per elective, for the section average printed next to a changed count.
+    const demand=root.ClassScenario?.demandMap?root.ClassScenario.demandMap(st,y):new Map();
+    function add(r,dept,hours,allocated=false,held=false){
+     if(hours===0)return;
+     const key=[r.name,kind(r),held?'held':''].join('|'),map=buckets.get(dept);
+     if(!map.has(key))map.set(key,{key,kind:kind(r),name:r.name+(held?' †':''),triples:[null,null,null],sources:[],order:r.sourceRow??999});
+     const entry=map.get(key),sections=allocated?(hours===null||!r.hours?null:hours/r.hours):r.sections;
+     const d=r.required?null:demand.get(r.id);
+     entry.triples[r.grade-1]={unit:r.hours,sections,hours,sourceSections:r.sections,allocated,per:d!=null&&r.sections>0?d/r.sections:null};
+     entry.sources.push({id:r.id,dept,grade:r.grade,hours,sections,allocated});
+    }
+    for(const r of relevant){
+     const category=M.sharedCategory(r);
+     if(!category){if(depts.includes(r.dept))add(r,r.dept,M.hours(r));continue;}
+     const a=M.assignmentStatus(r);
+     for(const v of a.allocations)if(depts.includes(v.dept))add(r,v.dept,v.hours,true);
+     // Only the originating area lists unresolved hours; cross-area recipients do not duplicate them.
+     if(originCategories.includes(category)&&(a.remaining===null||a.remaining>0))add(r,'미배정',a.remaining,true,a.over);
+    }
+    return {relevant,shared,outstanding,stats,buckets};
    }
-   for(const r of relevant){
-    const category=M.sharedCategory(r);
-    if(!category){if(depts.includes(r.dept))add(r,r.dept,M.hours(r));continue;}
-    const a=M.assignmentStatus(r);
-    for(const v of a.allocations)if(depts.includes(v.dept))add(r,v.dept,v.hours,true);
-    // Only the originating area lists unresolved hours; cross-area recipients do not duplicate them.
-    if(originCategories.includes(category)&&(a.remaining===null||a.remaining>0))add(r,'미배정',a.remaining,true,a.over);
+   const {relevant,shared,outstanding,stats,buckets}=collect(state),base=baseline?collect(baseline):null;
+   let changed=0;
+   if(base){
+    // A course closed since the baseline stays on the sheet as 0반 so the change is visible.
+    for(const [dept,map] of base.buckets){
+     const mine=buckets.get(dept);
+     for(const [key,e] of map){
+      if(!mine.has(key))mine.set(key,{...e,triples:[null,null,null],sources:[]});
+      const c=mine.get(key);
+      e.triples.forEach((b,i)=>{if(b&&!c.triples[i])c.triples[i]={...b,sections:0,hours:0,per:null};});
+     }
+    }
+    for(const [dept,map] of buckets)for(const [key,e] of map){
+     const b=base.buckets.get(dept)?.get(key);
+     e.triples.forEach((tr,i)=>{const o=b?.triples[i];if(tr&&(!o||o.sections!==tr.sections||o.hours!==tr.hours)){tr.changed=true;changed++;}});
+    }
+    for(const d of stats){const o=base.stats.find(x=>x.dept===d.dept);d.changed=o?{own:o.own!==d.own,received:o.received!==d.received,total:o.total!==d.total,average:o.average!==d.average}:{};}
    }
    const blocks=[...buckets].map(([dept,map])=>({dept,stats:stats.find(d=>d.dept===dept)||null,entries:[...map.values()].sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'ko'))})).filter(b=>b.entries.length||b.stats);
    for(const block of blocks){
     if(!block.entries.length)block.entries=[{key:'empty',kind:'—',name:'개설 과목 없음',triples:[null,null,null],sources:[]}];
-    for(const e of block.entries){e.cells=entryCells(e);e.lines=Math.max(...e.cells.map((c,i)=>lineCount(c,widths[i+1])));e.height=4.5*e.lines+0.9;}
+    for(const e of block.entries){e.cells=entryCells(e);e.lines=Math.max(...e.cells.map((c,i)=>lineCount(c,widths[i+1])));e.height=4.5*e.lines+0.9+(e.triples.some(x=>x?.changed&&x.per!=null)?3.2:0);}
    }
    const remaining=M.round(shared.reduce((n,r)=>n+(M.assignmentStatus(r).remaining??0),0)),unknown=relevant.filter(r=>M.hours(r)===null).length;
    const fractional=shared.filter(M.needsWholeSections).length;
@@ -79,10 +104,18 @@
    const totals={teachers:stats.some(d=>d.teachers===null)?null:stats.reduce((n,d)=>n+d.teachers,0),own:M.round(stats.reduce((n,d)=>n+d.own,0)),received:M.round(stats.reduce((n,d)=>n+d.received,0)),total:M.round(stats.reduce((n,d)=>n+d.total,0)),partial:stats.some(d=>d.partial)};
    totals.average=totals.teachers>0?M.round(totals.total/totals.teachers):null;
    const gradeTotals=[1,2,3].map(g=>M.round(blocks.filter(b=>b.stats).flatMap(b=>b.entries).reduce((n,e)=>n+(e.triples[g-1]?.hours??0),0)));
+   if(base){
+    const sum=k=>M.round(base.stats.reduce((n,d)=>n+(d[k]??0),0)),baseTeachers=base.stats.some(d=>d.teachers===null)?null:base.stats.reduce((n,d)=>n+d.teachers,0);
+    const baseTotal=sum('total');
+    totals.changed={own:sum('own')!==totals.own,received:sum('received')!==totals.received,total:baseTotal!==totals.total,average:(baseTeachers>0?M.round(baseTotal/baseTeachers):null)!==totals.average};
+    const baseGrades=[1,2,3].map(g=>M.round([...base.buckets].filter(([d])=>d!=='미배정'&&base.stats.some(x=>x.dept===d)).flatMap(([,m])=>[...m.values()]).reduce((n,e)=>n+(e.triples[g-1]?.hours??0),0)));
+    totals.gradesChanged=gradeTotals.map((n,i)=>n!==baseGrades[i]);
+   }
    const footnotes=[
     '담당 반 수 × 반당 시수 = 교과 시수입니다. 공통·융합·교양 과목은 담당 교과에 온전한 반 단위로 배정합니다.',
     '교사 평균 = 총시수 ÷ 교사 수. 미배정·배정 보류·창체는 제외합니다. *는 입력분 기준 잠정 평균입니다. 미개설·0반은 생략합니다.',
-    ...held.map(r=>{const a=M.assignmentStatus(r);return `† ${r.name}: ${r.sections}반 × ${r.hours}시간 = ${a.total}시간 / 기존 배정 ${a.requested}시간 보존, 평균 반영 보류.`;})
+    ...held.map(r=>{const a=M.assignmentStatus(r);return `† ${r.name}: ${r.sections}반 × ${r.hours}시간 = ${a.total}시간 / 기존 배정 ${a.requested}시간 보존, 평균 반영 보류.`;}),
+    ...(changed?['음영은 초기값과 달라진 칸입니다. 바뀐 담당 반 수 아래 작은 숫자는 반당 평균 인원(예상 선택 인원 ÷ 반 수)입니다.']:[])
    ];
    const chunks=[];let chunk=[],height=0;
    // Preserve department blocks whenever possible, and never shrink the 11 pt body text.
@@ -98,11 +131,12 @@
    }
    if(chunk.length)chunks.push(chunk);
    chunks.forEach((departments,i)=>pages.push({year:y,term:t,area:name,part:i+1,parts:chunks.length,title:`${y}학년도 ${name} 주간수업 배당표`,
-    subtitle:`${t}학기 · ${state.name} · 현재 조율안 · 단위: 시간/주, 반, 명`,
+    version:version||state.name,changed,
+    subtitle:`${t}학기 · ${version||state.name}${base?changed?' · 초기값과 다른 칸은 음영 표시':' · 초기값과 같음':''} · 단위: 시간/주, 반, 명`,
     classes:[1,2,3].map(g=>state.classes[y-g+1]),departments,stats,totals,gradeTotals,note,footnotes,
     entries:departments.flatMap(b=>b.entries),hasWarnings:outstanding||unknown>0||held.length>0||fractional>0||checks.length>0}));
   }
-  return {name:state.name,updatedAt:state.updatedAt||null,createdAt,pageLayout,hoursMode,widths,pages};
+  return {name:state.name,version:version||state.name,updatedAt:state.updatedAt||null,createdAt,pageLayout,hoursMode,widths,pages};
  }
  const text=s=>esc(s).replaceAll('\n','<br>');
  function tableHead(p,hoursMode){
@@ -117,19 +151,26 @@
   const label=`${p.year}학년도 ${p.term}학기 ${source.grade}학년 ${block.dept} ${entry.name} 담당 반 수 수정`;
   return `<button class="report-edit-count" ${action} aria-label="${esc(label)}" title="담당 반 수 수정">${text(value)}</button><span class="report-print-count">${text(value)}</span>`;
  }
+ // Which dept-stat column changed from the baseline (same order as statCells).
+ function statChanged(d,hoursMode,col){
+  if(!d?.changed)return false;
+  const keys=hoursMode==='total'?[null,'total','average']:[null,'own','received','total','average'];
+  return !!(keys[col]&&d.changed[keys[col]]);
+ }
  function render(report,{editable=false}={}){
   return report.pages.map((p,index)=>`<article class="report-page grouped-page" aria-label="${esc(p.title)} ${p.term}학기 ${p.part}쪽">
-   <div class="report-heading"><h2>${esc(p.title)}</h2><span>${p.term}학기 · ${p.part}/${p.parts}</span></div>
+   <div class="report-heading"><h2>${esc(p.title)} <span class="report-version">${esc(p.version)}</span></h2><span>${p.term}학기 · ${p.part}/${p.parts}</span></div>
    <p class="report-subtitle">${esc(p.subtitle)}</p>
    <table class="report-grid"><colgroup>${report.widths.map(w=>`<col style="width:${w/277*100}%">`).join('')}</colgroup>${tableHead(p,report.hoursMode)}<tbody>
    ${p.departments.map(block=>block.entries.map((e,i)=>`<tr class="${i===0?'report-dept-start':''}" data-report-key="${esc(block.dept+'|'+e.key)}">
    ${i===0?`<th class="report-department" rowspan="${block.entries.length}">${text(label(block.dept))}${block.continued?'<br><small>계속</small>':''}</th>`:''}
-   ${e.cells.map((c,col)=>`<td class="${col===0?'report-kind':col===1?'report-course':[3,6,9].includes(col)?'report-section-count':(col-4)%3===0?'report-grade-hours':''}">${editableCell(p,block,e,col,c,editable)}</td>`).join('')}
-   ${i===0?statCells(block.stats,report.hoursMode).map((v,col,values)=>`<td class="report-dept-stat ${col===values.length-1?'report-dept-average':''}" rowspan="${block.entries.length}">${text(v)}</td>`).join(''):''}</tr>`).join('')).join('')}
-   <tr class="report-total"><th colspan="3">${p.area} 전체 · 학기 합계</th>${p.gradeTotals.map(n=>`<td></td><td></td><td>${fmt(n)}</td>`).join('')}${statCells(p.totals,report.hoursMode).map(n=>`<td>${text(n)}</td>`).join('')}</tr></tbody></table>
+   ${e.cells.map((c,col)=>{const tr=col>=2?e.triples[Math.floor((col-2)/3)]:null,diff=tr?.changed&&(col-2)%3!==0;
+    return `<td class="${col===0?'report-kind':col===1?'report-course':[3,6,9].includes(col)?'report-section-count':(col-4)%3===0?'report-grade-hours':''}${diff?' report-changed':''}">${editableCell(p,block,e,col,c,editable)}${diff&&(col-2)%3===1&&tr.per!=null?`<small class="report-per">${fmt(Math.round(tr.per*10)/10)}명</small>`:''}</td>`;}).join('')}
+   ${i===0?statCells(block.stats,report.hoursMode).map((v,col,values)=>`<td class="report-dept-stat ${col===values.length-1?'report-dept-average':''}${statChanged(block.stats,report.hoursMode,col)?' report-changed':''}" rowspan="${block.entries.length}">${text(v)}</td>`).join(''):''}</tr>`).join('')).join('')}
+   <tr class="report-total"><th colspan="3">${p.area} 전체 · 학기 합계</th>${p.gradeTotals.map((n,g)=>`<td></td><td></td><td class="${p.totals.gradesChanged?.[g]?'report-changed':''}">${fmt(n)}</td>`).join('')}${statCells(p.totals,report.hoursMode).map((n,col)=>`<td class="${statChanged(p.totals,report.hoursMode,col)?'report-changed':''}">${text(n)}</td>`).join('')}</tr></tbody></table>
    <p class="report-status">${esc(p.note)}${p.parts>1?' · 교과별 수치는 해당 교과 전체, 마지막 학기 합계는 모든 쪽을 합친 값입니다.':''}</p>
    <div class="report-footnotes">${p.footnotes.map(note=>`<p>${esc(note)}</p>`).join('')}</div>
-   <div class="report-page-number"><span>시수 플래너 · ${esc(report.createdAt.slice(0,10))}</span><span>${index+1} / ${report.pages.length}</span></div></article>`).join('');
+   <div class="report-page-number"><span>시수 플래너 · ${esc(p.version)} · ${esc(report.createdAt.slice(0,10))}</span><span>${index+1} / ${report.pages.length}</span></div></article>`).join('');
  }
  root.PrintReport={build,render,statCells,entryCells,tripleCells,widths,kind,printGroups};
 })(globalThis);

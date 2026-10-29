@@ -1,7 +1,7 @@
 (function(root){
  'use strict';
  const M=root.Planner;
- root.createPrintReportUI=function({getState,header}){
+ root.createPrintReportUI=function({getState,header,getVersion=()=>getState().name,getBaseline=()=>null}){
   const displayKey='curriculum-print-hours-mode-v1';
   const selectionKey='curriculum-print-departments-v1';
   const layoutKey='curriculum-print-page-layout-v1';
@@ -17,7 +17,7 @@
   });
   observer.observe(document.querySelector('#main'));
   function view(){
-   const report=root.PrintReport.build(getState(),{year,term,departments,groupAreas,pageLayout,hoursMode});
+   const version=getVersion(),report=root.PrintReport.build(getState(),{year,term,departments,groupAreas,pageLayout,hoursMode,version,baseline:getBaseline()});
    const fractional=getState().rows.filter(M.needsWholeSections).length;
    return header('A4 인쇄 · PDF','교과별로 묶은 배당표 · 구분은 공통·일반·진로·융합으로 표시합니다.',false)+
     `<section class="surface report-controls"><label>학년도 <select id="report-year"><option value="0">2027~2029 전체</option>${M.YEARS.map(y=>`<option value="${y}" ${year===y?'selected':''}>${y}학년도</option>`).join('')}</select></label>
@@ -27,6 +27,7 @@
     <fieldset class="report-department-picker"><legend>인쇄할 교과 선택 <span>${departments.length}개 선택</span></legend><div class="report-selection-actions"><button class="button small" data-report-select="all">전체 선택</button><button class="button small" data-report-select="social-science">사회·과학 선택</button><button class="button small" data-report-select="none">선택 해제</button></div>
     ${choices.map(([label,depts])=>`<div class="report-choice-row"><strong>${label}</strong><div>${depts.map(d=>`<label><input id="report-dept-${M.TEACHING_DEPTS.indexOf(d)}" type="checkbox" data-report-dept="${d}" ${departments.includes(d)?'checked':''}>${d}</label>`).join('')}</div></div>`).join('')}
     ${pageLayout==='separate'?`<label class="report-group-option"><input id="report-group-areas" type="checkbox" ${groupAreas?'checked':''}>사회·과학은 각각 묶어서 출력</label>`:''}<p>${pageLayout==='continuous'?'같은 학년도·학기의 선택 교과를 한 표에 이어서 출력합니다. 한 장에 들어가는 만큼 모으고, 분량이 많으면 다음 장으로 이어집니다. 학년도·학기가 바뀔 때는 새 페이지를 시작합니다.':'선택한 교과마다 새 페이지로 출력합니다. 묶기 해제 시 사회·과학의 세부 교과도 각각 나뉩니다.'} 공통·융합·교양 과목은 배정받은 담당 교과에 포함됩니다.</p></fieldset>
+    <p class="report-version-line">인쇄 버전 <b>${version}</b>${report.pages.some(p=>p.changed)?' · 초기값과 달라진 칸은 음영, 바뀐 담당 반 수 아래에 반당 평균 인원을 표시합니다.':' · 초기값과 다른 칸이 없습니다.'}</p>
     <button class="button primary" data-action="print" ${report.pages.length?'':'disabled'}>현재 값으로 인쇄 / PDF 저장</button>
     <p>미리보기 ${report.pages.length}쪽 · 표의 <b>담당 반 수를 누르면 수정</b>할 수 있습니다. ‘배정 적용’ 후 시수·평균이 바로 갱신되며, 현재 화면의 값으로 인쇄합니다.<br>인쇄 창에서 <b>PDF로 저장 → A4 → 가로 → 배율 100%</b>를 선택하세요. 머리글·바닥글은 끄세요.</p>
     ${fractional?`<div class="report-normalize"><span>전체 예상안에 반 단위 정리가 필요한 과목 ${fractional}개</span><button class="button small" data-assignment-action="section-preview">소수 담당 반 수 정리</button></div>`:''}</section>
@@ -46,7 +47,13 @@
   }
   document.addEventListener('change',change);
   document.addEventListener('click',e=>{const button=e.target.closest('[data-report-select]');if(!button)return;departments=button.dataset.reportSelect==='all'?[...M.TEACHING_DEPTS]:button.dataset.reportSelect==='social-science'?[...socialScience]:[];rememberSelection();refresh();});
-  function print(){if(!departments.length)return;refresh();window.print();}
+  // The browser offers document.title as the PDF file name, so it carries the version name while printing.
+  function print(){
+   if(!departments.length)return;refresh();
+   const old=document.title,restore=()=>{document.title=old;window.removeEventListener('afterprint',restore);};
+   document.title=`${year?`${year}학년도`:'2027-2029학년도'}${term?` ${term}학기`:''} 주간수업 배당표_${getVersion()}`.replace(/[\\/:*?"<>|]/g,'_');
+   window.addEventListener('afterprint',restore);window.print();
+  }
   return {view,print};
  };
 })(globalThis);

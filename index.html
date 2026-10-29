@@ -6,7 +6,7 @@
   <meta name="description" content="2027~2029학년도 교육과정 기반 과목별 예상 수업시수. 개설 반 수와 선택군 목표 반 수를 조정하고 학년도별 결과를 비교합니다.">
   <title>교육과정 시수 플래너 · 2027–2029</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261027.1">
+  <link rel="stylesheet" href="styles.css?v=20261030.1">
   <link rel="stylesheet" href="selection-board.css?v=20261027.1">
   <script defer src="data.js?v=20261027.1"></script>
   <script defer src="choice-final.js?v=20261029.1"></script>
@@ -19,10 +19,11 @@
   <script defer src="selection-board.js?v=20261029.5"></script>
   <link rel="stylesheet" href="class-scenario.css?v=20261029.3">
   <script defer src="class-scenario.js?v=20261029.3"></script>
-  <link rel="stylesheet" href="print-report.css?v=20261028.1">
-  <script defer src="grouped-report.js?v=20261028.1"></script>
-  <script defer src="print-report.js?v=20261028.1"></script>
-  <script defer src="app.js?v=20261029.5"></script>
+  <link rel="stylesheet" href="print-report.css?v=20261030.1">
+  <script defer src="grouped-report.js?v=20261030.1"></script>
+  <script defer src="print-report.js?v=20261030.1"></script>
+  <script defer src="versions.js?v=20261030.1"></script>
+  <script defer src="app.js?v=20261030.1"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">본문 바로가기</a>
@@ -42,7 +43,7 @@
     <div class="sidebar-bottom"><span class="eyebrow">PLANNING YEARS</span><strong>2027 — 2029</strong><p>입학 연도별 교육과정을<br>한 학년도로 모아 계산합니다.</p><button id="help" class="text-button">사용 방법 보기</button></div>
   </aside>
   <div class="workspace">
-    <header class="topbar"><div class="breadcrumb">학교 교육과정 <span>/</span> 예상 시수</div><div class="top-actions"><span id="save-status" role="status">기본 예상안</span><button id="undo" class="button subtle" disabled>되돌리기</button><button id="import" class="button subtle">불러오기</button><button data-view="print" class="button">A4 인쇄 · PDF</button><button id="backup" class="button primary">예상안 저장</button></div></header>
+    <header class="topbar"><div class="breadcrumb">학교 교육과정 <span>/</span> 예상 시수</div><div class="top-actions"><span id="version-badge" class="version-badge" role="status" aria-live="polite"></span><span id="save-status" role="status"></span><button id="undo" class="button subtle" disabled>되돌리기</button><button id="to-initial" class="button subtle">초기값으로</button><button id="import" class="button subtle">버전 열기</button><button data-view="print" class="button">A4 인쇄 · PDF</button><button id="backup" class="button primary">버전 저장</button></div></header>
     <main id="main" tabindex="-1"></main>
     <footer>시수 = 반당 주당시수 × 개설 반 수 <span>·</span> 교사 1인 평균 = 해당 학기 교과 총시수 ÷ 교사 수 <span>·</span> 창체 별도</footer>
   </div>

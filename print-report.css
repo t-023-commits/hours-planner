@@ -78,3 +78,7 @@
  .grouped-page .report-grid th,.grouped-page .report-grid td{padding:.25mm .65mm!important;line-height:1.15!important}
  .grouped-page .report-grid thead th{font-size:10pt!important;padding:.8mm .3mm!important;line-height:1.12!important}
 }
+.report-version{display:inline-block;margin-left:3mm;padding:.3mm 2.5mm;border:.35mm solid #111;border-radius:1.2mm;font-size:11pt;font-weight:800;vertical-align:middle}
+.grouped-page .report-grid td.report-changed,.grouped-page .report-grid .report-total td.report-changed{background:#cfcfcf!important;font-weight:800;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report-per{display:block;font-size:7.5pt;font-weight:500;line-height:1.1;color:#333}
+.report-version-line{font-size:.875rem}
