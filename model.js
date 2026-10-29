@@ -47,21 +47,11 @@
     if(total===null||total===baseGroupTarget(state,year,g))delete state.groupTargets[key];
     else state.groupTargets[key]=total;
   }
-  // Grade size = applications in a fully recorded selection block ÷ picks (과목별 선택인원 2026.9.28.).
-  // 2025 입학생 239명, 2026 입학생 267명. Later cohorts have no data and stay blank (미정).
-  function defaultCohortStudents(){
-    const out=Object.fromEntries(COHORTS.map(c=>[c,null]));
-    for(const cohort of COHORTS){
-      for(const g of D.groups.filter(g=>g.cohort===cohort)){
-        const rows=D.curriculum.filter(r=>r.groupId===g.id);
-        const found=rows.map(r=>D.choices.find(x=>x.cohort===cohort&&x.grade===r.grade&&x.term===r.term&&x.name===r.name));
-        if(!rows.length||found.some(x=>!x||!num(x.students)))continue;
-        const n=found.reduce((s,x)=>s+x.students,0)/g.picks;
-        if(Number.isInteger(n)&&n>0){out[cohort]=n;break;}
-      }
-    }
-    return out;
-  }
+  // 2027학년도 반편성 기준 학생 수: 2025 입학생 243명, 2026 입학생 274명. 이후 입학생은 미정.
+  // 과목별 선택인원(2026.9.28.)의 응답 합계(239명·267명)는 이 학생 수에 맞춰 비례 환산합니다.
+  const KNOWN_STUDENTS={2025:243,2026:274};
+  const SURVEY_STUDENTS={2025:239,2026:267};
+  function defaultCohortStudents(){return Object.fromEntries(COHORTS.map(c=>[c,KNOWN_STUDENTS[c]??null]));}
   function defaultTeacherCounts(){
     return Object.fromEntries(YEARS.map(y=>[y,Object.fromEntries(D.departments.map(d=>{const n=D.teacherReference.find(x=>x.dept===d)?.count??null;return [d,[n,n]];}))]));
   }
@@ -433,6 +423,8 @@
     if(typeof value.cohortStudents!=='object'||Array.isArray(value.cohortStudents))throw new Error('학년별 학생 수 자료를 확인해 주세요.');
     for(const c of COHORTS){
       if(value.cohortStudents[c]===undefined)value.cohortStudents[c]=students[c];
+      // The first release filled in the survey totals; replace those untouched defaults.
+      if(value.cohortStudents[c]===SURVEY_STUDENTS[c])value.cohortStudents[c]=KNOWN_STUDENTS[c];
       const n=value.cohortStudents[c];
       if(n!==null&&(!Number.isInteger(n)||n<1||n>2000))throw new Error('학년별 학생 수는 1~2000명 또는 미정이어야 합니다.');
     }
