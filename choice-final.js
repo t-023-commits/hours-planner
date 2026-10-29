@@ -1,6 +1,6 @@
 /* 과목별 선택인원(2026.10.28.) 최종 자료. 2027학년도 2학년(2026 입학생 274명)·3학년(2025 입학생 243명) 선택과목.
    first = 처음 인원(E열), change = 수정 기간 증감(V열), students = 최종 인원(W열), sections = 최종 개설반(X열).
-   fileSections가 있는 과목은 학교 초기 편성으로 개설반을 고친 값입니다(2학년 일본어·일본 문화: 파일 10반 → 11반, 중국어·중국 문화 2반과 합해 13반). */
+   fileSections가 있는 과목은 학교 초기 편성으로 개설반을 고친 값입니다(2학년 일본어·일본 문화: 파일 10반 → 11반, 3학년 일본어 회화: 파일 3반 → 4반. 택1 선택군이 13학급 기준 13반이 되도록 맞춤). */
 globalThis.CHOICE_FINAL = {
  version:'2026-10-28',
  label:'과목별 선택인원(2026.10.28.)',
@@ -53,7 +53,7 @@ globalThis.CHOICE_FINAL = {
   {"cohort":2025,"grade":3,"term":1,"name":"지구시스템과학","first":18,"change":-18,"students":0,"sections":0},
   {"cohort":2025,"grade":3,"term":1,"name":"행성우주과학","first":0,"change":0,"students":0,"sections":0},
   {"cohort":2025,"grade":3,"term":1,"name":"인공지능 기초","first":64,"change":-3,"students":61,"sections":4},
-  {"cohort":2025,"grade":3,"term":1,"name":"일본어 회화","first":79,"change":-8,"students":71,"sections":3},
+  {"cohort":2025,"grade":3,"term":1,"name":"일본어 회화","first":79,"change":-8,"students":71,"sections":4,"fileSections":3},
   {"cohort":2025,"grade":3,"term":1,"name":"중국어 회화","first":27,"change":-2,"students":25,"sections":1},
   {"cohort":2025,"grade":3,"term":1,"name":"언어생활과 한자","first":0,"change":0,"students":0,"sections":0},
   {"cohort":2025,"grade":3,"term":1,"name":"생태와 환경","first":45,"change":16,"students":61,"sections":3},
