@@ -48,10 +48,36 @@
     else state.groupTargets[key]=total;
   }
   // 2027학년도 반편성 기준 학생 수: 2025 입학생 243명, 2026 입학생 274명. 이후 입학생은 미정.
-  // 과목별 선택인원(2026.9.28.)의 응답 합계(239명·267명)는 이 학생 수에 맞춰 비례 환산합니다.
+  // 2027학년도 선택인원(2026.10.28. 최종)은 합계가 이 학생 수와 같고, 다른 학년도의 과거 자료 추정은 이 학생 수에 맞춰 비례 환산합니다.
   const KNOWN_STUDENTS={2025:243,2026:274};
   const SURVEY_STUDENTS={2025:239,2026:267};
   function defaultCohortStudents(){return Object.fromEntries(COHORTS.map(c=>[c,KNOWN_STUDENTS[c]??null]));}
+  // 2027학년도 2·3학년 선택과목은 과목별 선택인원(2026.10.28.) 최종 자료(choice-final.js)를 씁니다.
+  // 인원은 항상 최종값으로, 반 수는 직접 수정하지 않은 과목만 최종 개설반으로 맞춥니다.
+  const FINAL=root.CHOICE_FINAL||null;
+  function finalChoice(row){
+    if(!FINAL||row.year!==FINAL.year)return null;
+    return FINAL.rows.find(x=>x.cohort===row.cohort&&x.grade===row.grade&&x.term===row.term&&x.name===row.name)||null;
+  }
+  function applyFinalChoices(state){
+    if(!FINAL||state.choiceVersion===FINAL.version)return null;
+    const result={students:0,sections:0,groups:0},touched=new Set();
+    for(const r of state.rows){
+      const x=finalChoice(r);if(!x)continue;
+      if(r.students!==x.students){r.students=x.students;result.students++;}
+      if(!r.edited&&r.enabled&&r.sections!==x.sections){r.sections=x.sections;result.sections++;}
+      if(r.groupId)touched.add(r.groupId);
+    }
+    // A group untouched by the user follows the school's final total (예: 택1 제2외국어 12반).
+    for(const id of touched){
+      const rows=state.rows.filter(r=>r.year===FINAL.year&&r.groupId===id);
+      if(rows.some(r=>r.edited||r.enabled&&r.sections===null))continue;
+      const total=rows.reduce((n,r)=>n+(r.enabled?r.sections:0),0);
+      if(total>=1&&total<=300&&total!==groupTarget(state,FINAL.year,id)){setGroupTarget(state,FINAL.year,id,total);result.groups++;}
+    }
+    state.choiceVersion=FINAL.version;
+    return result;
+  }
   function defaultTeacherCounts(){
     return Object.fromEntries(YEARS.map(y=>[y,Object.fromEntries(D.departments.map(d=>{const n=D.teacherReference.find(x=>x.dept===d)?.count??null;return [d,[n,n]];}))]));
   }
@@ -256,6 +282,7 @@
         }
       }
     }
+    applyFinalChoices(state);
     return state;
   }
   function requiredClasses(row, n) {
@@ -428,6 +455,8 @@
       const n=value.cohortStudents[c];
       if(n!==null&&(!Number.isInteger(n)||n<1||n>2000))throw new Error('학년별 학생 수는 1~2000명 또는 미정이어야 합니다.');
     }
+    if(value.choiceVersion!==undefined&&(typeof value.choiceVersion!=='string'||value.choiceVersion.length>20))throw new Error('선택인원 자료 버전을 확인해 주세요.');
+    applyFinalChoices(value);
     const ids=new Set(), courseKeys=new Set();
     for(const r of value.rows){
       if(typeof r.id!=='string'||r.id.length>150||ids.has(r.id))throw new Error('중복되거나 잘못된 과목 식별자가 있습니다.');
@@ -466,5 +495,5 @@
     return '"'+s.replaceAll('"','""')+'"';
   }
   function csv(matrix) {return '\ufeff'+matrix.map(row=>row.map(csvCell).join(',')).join('\r\n');}
-  root.Planner={YEARS,COHORTS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,integerAllocationPlan,allocationSectionStep,assignedSections,needsWholeSections,sectionEntries,setAllocationSections,suggestSectionAllocations,wholeSectionAllocationPlan,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan,groupKey,groupTarget,baseGroupTarget,setGroupTarget,defaultCohortStudents};
+  root.Planner={YEARS,COHORTS,clone,round,sortRows,defaultState,hours,summarize,pivot,setCohortClasses,recommendSections,groupChecks,validateState,csv,requiredClasses,selectionGroup,selectionLabel,groupsForYear,matchesGroup,defaultTeacherCounts,setTeacherCount,teacherSummary,SHARED_DEPTS,TEACHING_DEPTS,sharedCategory,receivingDepartments,assignmentStatus,setAllocations,validateAllocations,effectiveRows,assignmentOverview,suggestAllocations,integerAllocationPlan,allocationSectionStep,assignedSections,needsWholeSections,sectionEntries,setAllocationSections,suggestSectionAllocations,wholeSectionAllocationPlan,groupRows,groupSectionPlan,groupSectionStatus,balanceGroupSections,applyGroupSections,autoSectionPlan,finalChoice,applyFinalChoices,groupKey,groupTarget,baseGroupTarget,setGroupTarget,defaultCohortStudents};
 })(globalThis);

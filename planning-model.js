@@ -62,7 +62,7 @@
   return ref?`${ref.students===null?'인원 미정':ref.students+'명'} · ${ref.sections===null?'반 수 미정':ref.sections+'반'} · ${ref.cohort} 입학생 ${ref.grade}학년 ${ref.term}학기`:row.projection?.missing?'같은 과목 선택자료 없음 · 선택군 평균 반 수 가정':'같은 과목 선택자료 없음';
  }
  function projectionText(row){
-  if(!row.projection)return row.basis==='actual'?'2026.9.28. 최종 선택자료 반영':'기존 예상안의 값';
+  if(!row.projection)return row.basis==='actual'?(M.finalChoice?.(row)?'2026.10.28. 최종 선택인원 반영':'2026.9.28. 최종 선택자료 반영'):'기존 예상안의 값';
   const d=demandFor(row);
   return (row.edited?'직접 조율 · ':'')+(d?`${d.students} ÷ (239명 × 택3) = ${(d.share*100).toFixed(2)}% 수요를 반영` : row.projection.missing?'선택자료 없는 신설 과목은 같은 선택군 평균을 가정':'기존 반 수 비율을 유지')+' · 선택군 목표에 맞춰 정수 배분';
  }

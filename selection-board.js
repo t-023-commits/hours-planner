@@ -6,7 +6,8 @@
   const period=()=>getTerm()||1;
   const current=()=>getState();
   function referenceCell(r){
-   const demand=U.demandFor(r),ref=r.ref;
+   const demand=U.demandFor(r),ref=r.ref,fin=M.finalChoice(r);
+   if(fin)return `<button class="reference-button" data-selection-reference="${esc(r.id)}"><strong>${f(fin.students)}명 <small> / ${f(fin.sections)}반</small></strong><span>2026.10.28. 최종 선택인원</span><span class="reference-link">선택자료·산정 근거 보기 ↗</span></button>`;
    return `<button class="reference-button" data-selection-reference="${esc(r.id)}"><strong>${demand?`${demand.students}명 <small>보충 수요</small>`:ref?`${f(ref.students)}${ref.students===null?'':'명'} <small> / ${f(ref.sections)}반</small>`:'자료 없음'}</strong><span>${demand?'2026학년도 2학년 2학기':ref?`${ref.cohort} 입학생 · ${ref.grade}학년 ${ref.term}학기`:'같은 선택군 평균 반 수 가정'}</span><span class="reference-link">선택자료·산정 근거 보기 ↗</span></button>`;
   }
   function statusBanner(){return `<div class="update-banner"><div><b>${current().planningVersion===P.version?'경제·윤리 수요 보정안 기반':'기존에 저장한 예상안 유지 중'}</b><p>${current().planningVersion===P.version?'경제 57명 · 윤리와 사상 99명 참고 / 이후 직접 조율한 값은 현재 표에 반영됩니다.':'최신 보정값과 관련 교과 배정은 ‘보정안 비교·불러오기’에서 확인한 후 적용할 수 있습니다.'}</p></div><button class="button" data-selection-action="compare">보정안 비교·불러오기</button></div>`;}
@@ -25,10 +26,11 @@
    <div class="report-links"><a class="button" href="downloads/social-science-comparison.xlsx" download>엑셀 비교표 받기</a><button class="button primary" data-view="print">현재 예상안 A4 인쇄 · PDF</button><a href="downloads/adjusted-plan-print.pdf" target="_blank" rel="noopener">첨부 조율안 PDF (고정본)</a><span>현재 수정값은 A4 인쇄 · PDF에서 출력합니다. 엑셀 비교표와 고정 PDF는 작성 당시 값입니다.</span></div>`;
   }
   function reference(id){
-   const r=current().rows.find(r=>r.id===id),refs=D.choices.filter(x=>x.name===r.name),d=U.demandFor(r),rule=P.rules.find(x=>x.name===r.name);
+   const r=current().rows.find(r=>r.id===id),refs=D.choices.filter(x=>x.name===r.name),d=U.demandFor(r),rule=P.rules.find(x=>x.name===r.name),fin=M.finalChoice(r);
    openDialog(`${esc(r.name)} · 선택자료와 산정 근거`,`${r.year}학년도 ${r.grade}학년 ${r.term}학기 · ${esc(M.selectionLabel(r))}`,
     `<div class="allocation-explanation"><b>현재 예상 ${f(r.sections)}반 · 주당 ${f(M.hours(r))}시간</b><p>${esc(U.projectionText(r))}</p></div>
     ${d?`<div class="demand-reference"><b>보충 자료: ${d.students}명 신청</b><p>2026학년도 2학년 2학기 · 2025 입학생 · 택3 선택군 / 사용자 제공</p><p>${esc(d.reason)}. 239명 × 택3 = 총 717건을 기준으로 ${(d.share*100).toFixed(2)}%를 미래 선택군 반 수에 적용하는 보정 가정입니다. 보정안에서 나머지 과목은 기존 비율로 정수 배분합니다. 미래의 실제 신청인원은 아닙니다.</p><details><summary>당시 택3 선택군의 과목</summary><p>${esc(P.demand.groupNames.join(' / '))}</p></details></div>`:''}
+    ${fin?`<h3>최종 선택인원 · 2026.10.28.</h3><div class="table-scroll"><table><thead><tr><th>입학 연도 · 이수 학기</th><th class="num">처음 인원</th><th class="num">수정 기간 증감</th><th class="num">최종 인원</th><th class="num">최종 개설반</th><th class="num">반당 평균</th></tr></thead><tbody><tr><td>${fin.cohort} 입학생<br>${fin.grade}학년 ${fin.term}학기</td><td class="num">${f(fin.first)}명</td><td class="num">${fin.change>0?'+':''}${f(fin.change)}명</td><td class="num"><b>${f(fin.students)}명</b></td><td class="num">${f(fin.sections)}반</td><td class="num">${fin.sections?`${f(M.round(fin.students/fin.sections))}명`:'—'}</td></tr></tbody></table></div>`:''}
     <h3>원본 선택인원 자료 · 2026.9.28.</h3><div class="table-scroll"><table><thead><tr><th>입학 연도 · 이수 학기</th><th class="num">신청인원</th><th class="num">개설반</th><th>출처</th></tr></thead><tbody>${refs.map(ref=>`<tr><td>${ref.cohort} 입학생<br>${ref.grade}학년 ${ref.term}학기</td><td class="num">${f(ref.students)}명</td><td class="num">${f(ref.sections)}반</td><td>${esc(ref.source)}</td></tr>`).join('')||'<tr><td colspan="4">같은 과목의 선택자료가 없습니다. 최신 보정안에서는 같은 선택군의 기존 반 수 평균을 가정합니다.</td></tr>'}</tbody></table></div><p class="field-help">원본 0명·0반은 그대로 보관하며, 보충 자료와 구분합니다. 2027학년도는 최종 선택자료의 실제 반 수를 유지하고 2028·2029학년도에만 수요를 보정합니다.</p>
     ${rule?`<div class="allocation-explanation"><b>관련 교과: ${esc(rule.allowed.join(' · '))}</b><p>${esc(rule.basis)}<br>${esc(rule.file)} · ${esc(rule.pages)}쪽<br>교육과정 내용에 따른 배정 가정입니다.</p></div>`:''}`);
   }
