@@ -46,6 +46,8 @@
 .grouped-page .report-grid .report-department{background:#eef1f3;text-align:center;font-weight:800;vertical-align:middle}
 .grouped-page .report-grid .report-dept-stat{background:#f2f3f4;font-weight:700;vertical-align:middle}
 .grouped-page .report-grid .report-dept-average{background:#e6ece7;font-weight:800}
+.grouped-page .report-grid .report-year-average{background:#dde6df}
+.grouped-page .report-grid thead th small{font-size:8pt;font-weight:600}
 .grouped-page .report-grid .report-grade-hours{background:#f4f4f4}
 .grouped-page .report-grid .report-dept-start>*{border-top:.55mm solid #222}
 .grouped-page .report-grid .report-total th{text-align:left;background:#dce2e5;font-size:10.5pt}

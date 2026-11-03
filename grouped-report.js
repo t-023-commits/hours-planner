@@ -3,7 +3,7 @@
  const M=root.Planner;
  const areas={사회:['역사','일반사회','지리','윤리'],과학:['물리학','화학','생명과학','지구과학']};
  const categories={사회:'사회 공통',과학:'과학 공통·융합'};
- const rawWidths=[72,44,270,...Array(9).fill(40),42,52,52,52,66];
+ const rawWidths=[72,44,226,...Array(9).fill(40),42,52,52,52,58,58];
  function reportWidths(hoursMode='detail'){
   const selected=hoursMode==='total'?rawWidths.filter((_,i)=>i!==13&&i!==14):rawWidths;
   return selected.map(w=>w/selected.reduce((n,v)=>n+v,0)*277);
@@ -20,8 +20,9 @@
  function tripleCells(t){return t?[fmt(t.unit),fmt(t.sections),fmt(t.hours)]:['','',''];}
  function entryCells(e){return [e.kind,e.name,...e.triples.flatMap(tripleCells)];}
  function statCells(d,hoursMode='detail'){
-  const cells=d?[fmt(d.teachers),fmt(d.own),fmt(d.received),fmt(d.total),d.average===null?'미산정':fmt(d.average)+(d.partial?'*':'')]:['—','—','—','—','—'];
-  return hoursMode==='total'?[cells[0],cells[3],cells[4]]:cells;
+  const avg=(v,partial)=>v===null||v===undefined?'미산정':fmt(v)+(partial?'*':'');
+  const cells=d?[fmt(d.teachers),fmt(d.own),fmt(d.received),fmt(d.total),avg(d.average,d.partial),avg(d.yearAverage,d.yearPartial)]:['—','—','—','—','—','—'];
+  return hoursMode==='total'?[cells[0],cells[3],cells[4],cells[5]]:cells;
  }
  function printGroups(departments,groupAreas,area){
   if(!Array.isArray(departments))return Object.keys(areas).filter(a=>area==='all'||a===area).map(name=>({name,depts:areas[name],category:categories[name]}));
@@ -50,7 +51,13 @@
     const relevant=all.filter(r=>depts.includes(r.dept)||originCategories.includes(M.sharedCategory(r))||
      M.sharedCategory(r)&&(r.allocations||[]).some(a=>depts.includes(a.dept)));
     const shared=relevant.filter(r=>M.sharedCategory(r)),outstanding=shared.some(r=>{const a=M.assignmentStatus(r);return a.remaining===null||a.remaining>0||a.over;});
-    const stats=M.teacherSummary(st,y).filter(d=>depts.includes(d.dept)).map(d=>{const v=d.terms[t-1];return {dept:d.dept,teachers:v.teachers,own:v.own,received:v.received,total:v.total,average:v.perTeacher,partial:!!(v.missing||v.pendingTransfers||outstanding)};});
+    // 학년도 평균은 두 학기를 함께 봅니다: (1학기 총시수 + 2학기 총시수) ÷ (1학기 교사 수 + 2학기 교사 수).
+    const unresolved=term=>st.rows.filter(r=>r.year===y&&r.term===term&&M.sharedCategory(r)&&(depts.includes(r.dept)||originCategories.includes(M.sharedCategory(r))||(r.allocations||[]).some(a=>depts.includes(a.dept)))).some(r=>{const a=M.assignmentStatus(r);return a.remaining===null||a.remaining>0||a.over;});
+    const yearOutstanding=outstanding||unresolved(3-t);
+    const stats=M.teacherSummary(st,y).filter(d=>depts.includes(d.dept)).map(d=>{const v=d.terms[t-1],[a,b]=d.terms,n=(a.teachers??0)+(b.teachers??0);
+     return {dept:d.dept,teachers:v.teachers,own:v.own,received:v.received,total:v.total,average:v.perTeacher,partial:!!(v.missing||v.pendingTransfers||outstanding),
+      yearTeachers:a.teachers===null||b.teachers===null?null:n,yearTotal:M.round(a.total+b.total),yearAverage:a.perTeacher===null||b.perTeacher===null||!(n>0)?null:M.round((a.total+b.total)/n),
+      yearPartial:!!(a.missing||a.pendingTransfers||b.missing||b.pendingTransfers||yearOutstanding)};});
     const buckets=new Map([...depts,'미배정'].map(d=>[d,new Map()]));
     // Expected applicants per elective, for the section average printed next to a changed count.
     const demand=root.ClassScenario?.demandMap?root.ClassScenario.demandMap(st,y):new Map();
@@ -89,7 +96,7 @@
      const b=base.buckets.get(dept)?.get(key);
      e.triples.forEach((tr,i)=>{const o=b?.triples[i];if(tr&&(!o||o.sections!==tr.sections||o.hours!==tr.hours)){tr.changed=true;changed++;}});
     }
-    for(const d of stats){const o=base.stats.find(x=>x.dept===d.dept);d.changed=o?{own:o.own!==d.own,received:o.received!==d.received,total:o.total!==d.total,average:o.average!==d.average}:{};}
+    for(const d of stats){const o=base.stats.find(x=>x.dept===d.dept);d.changed=o?{own:o.own!==d.own,received:o.received!==d.received,total:o.total!==d.total,average:o.average!==d.average,yearAverage:o.yearAverage!==d.yearAverage}:{};}
    }
    const blocks=[...buckets].map(([dept,map])=>({dept,stats:stats.find(d=>d.dept===dept)||null,entries:[...map.values()].sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'ko'))})).filter(b=>b.entries.length||b.stats);
    for(const block of blocks){
@@ -103,17 +110,19 @@
    const note=`미배정 ${fmt(remaining)}시간 · 시수 미정 ${unknown}과목`+(held.length?` · 배정 보류 ${held.length}과목`:'')+(fractional?` · 반 단위 배정 확인 ${fractional}과목`:'')+(checks.length?` · 선택군 점검 ${checks.length}개`:'');
    const totals={teachers:stats.some(d=>d.teachers===null)?null:stats.reduce((n,d)=>n+d.teachers,0),own:M.round(stats.reduce((n,d)=>n+d.own,0)),received:M.round(stats.reduce((n,d)=>n+d.received,0)),total:M.round(stats.reduce((n,d)=>n+d.total,0)),partial:stats.some(d=>d.partial)};
    totals.average=totals.teachers>0?M.round(totals.total/totals.teachers):null;
+   const yearAverageOf=list=>{const n=list.some(d=>d.yearTeachers===null)?null:list.reduce((s,d)=>s+d.yearTeachers,0);return n>0?M.round(list.reduce((s,d)=>s+d.yearTotal,0)/n):null;};
+   totals.yearAverage=yearAverageOf(stats);totals.yearPartial=stats.some(d=>d.yearPartial);
    const gradeTotals=[1,2,3].map(g=>M.round(blocks.filter(b=>b.stats).flatMap(b=>b.entries).reduce((n,e)=>n+(e.triples[g-1]?.hours??0),0)));
    if(base){
     const sum=k=>M.round(base.stats.reduce((n,d)=>n+(d[k]??0),0)),baseTeachers=base.stats.some(d=>d.teachers===null)?null:base.stats.reduce((n,d)=>n+d.teachers,0);
     const baseTotal=sum('total');
-    totals.changed={own:sum('own')!==totals.own,received:sum('received')!==totals.received,total:baseTotal!==totals.total,average:(baseTeachers>0?M.round(baseTotal/baseTeachers):null)!==totals.average};
+    totals.changed={own:sum('own')!==totals.own,received:sum('received')!==totals.received,total:baseTotal!==totals.total,average:(baseTeachers>0?M.round(baseTotal/baseTeachers):null)!==totals.average,yearAverage:yearAverageOf(base.stats)!==totals.yearAverage};
     const baseGrades=[1,2,3].map(g=>M.round([...base.buckets].filter(([d])=>d!=='미배정'&&base.stats.some(x=>x.dept===d)).flatMap(([,m])=>[...m.values()]).reduce((n,e)=>n+(e.triples[g-1]?.hours??0),0)));
     totals.gradesChanged=gradeTotals.map((n,i)=>n!==baseGrades[i]);
    }
    const footnotes=[
     '담당 반 수 × 반당 시수 = 교과 시수입니다. 공통·융합·교양 과목은 담당 교과에 온전한 반 단위로 배정합니다.',
-    '교사 평균 = 총시수 ÷ 교사 수. 미배정·배정 보류·창체는 제외합니다. *는 입력분 기준 잠정 평균입니다. 미개설·0반은 생략합니다.',
+    `교사 평균 = 총시수 ÷ 교사 수. ${t}학기 평균은 이 학기만, 학년도 평균은 (1학기 + 2학기 총시수) ÷ (1학기 + 2학기 교사 수)입니다. 미배정·배정 보류·창체는 제외합니다. *는 입력분 기준 잠정 평균입니다. 미개설·0반은 생략합니다.`,
     ...held.map(r=>{const a=M.assignmentStatus(r);return `† ${r.name}: ${r.sections}반 × ${r.hours}시간 = ${a.total}시간 / 기존 배정 ${a.requested}시간 보존, 평균 반영 보류.`;}),
     ...(changed?['음영은 초기값과 달라진 칸입니다. 바뀐 담당 반 수 아래 작은 숫자는 반당 평균 인원(예상 선택 인원 ÷ 반 수)입니다.']:[])
    ];
@@ -140,8 +149,8 @@
  }
  const text=s=>esc(s).replaceAll('\n','<br>');
  function tableHead(p,hoursMode){
-  const labels=hoursMode==='total'?['교사<br>수','교과<br>총시수','교사 1인<br>평균']:['교사<br>수','자체<br>시수','배정<br>시수','교과<br>총시수','교사 1인<br>평균'];
-  return `<thead><tr><th rowspan="2">담당<br>교과</th><th rowspan="2">구분</th><th rowspan="2">과목명</th>${p.classes.map((c,i)=>`<th colspan="3">${i+1}학년 (${c}학급)</th>`).join('')}${labels.map(s=>`<th rowspan="2">${s}</th>`).join('')}</tr><tr>${p.classes.map(()=>'<th>반당<br>시수</th><th>담당<br>반 수</th><th>교과<br>시수</th>').join('')}</tr></thead>`;
+  const labels=hoursMode==='total'?['교사<br>수','교과<br>총시수']:['교사<br>수','자체<br>시수','배정<br>시수','교과<br>총시수'];
+  return `<thead><tr><th rowspan="2">담당<br>교과</th><th rowspan="2">구분</th><th rowspan="2">과목명</th>${p.classes.map((c,i)=>`<th colspan="3">${i+1}학년 (${c}학급)</th>`).join('')}${labels.map(s=>`<th rowspan="2">${s}</th>`).join('')}<th colspan="2">교사 1인 평균</th></tr><tr>${p.classes.map(()=>'<th>반당<br>시수</th><th>담당<br>반 수</th><th>교과<br>시수</th>').join('')}<th>${p.term}학기</th><th>학년도<br><small>1·2학기</small></th></tr></thead>`;
  }
  function editableCell(p,block,entry,col,value,editable){
   if(!editable||![3,6,9].includes(col))return text(value);
@@ -154,7 +163,7 @@
  // Which dept-stat column changed from the baseline (same order as statCells).
  function statChanged(d,hoursMode,col){
   if(!d?.changed)return false;
-  const keys=hoursMode==='total'?[null,'total','average']:[null,'own','received','total','average'];
+  const keys=hoursMode==='total'?[null,'total','average','yearAverage']:[null,'own','received','total','average','yearAverage'];
   return !!(keys[col]&&d.changed[keys[col]]);
  }
  function render(report,{editable=false}={}){
@@ -166,7 +175,7 @@
    ${i===0?`<th class="report-department" rowspan="${block.entries.length}">${text(label(block.dept))}${block.continued?'<br><small>계속</small>':''}</th>`:''}
    ${e.cells.map((c,col)=>{const tr=col>=2?e.triples[Math.floor((col-2)/3)]:null,diff=tr?.changed&&(col-2)%3!==0;
     return `<td class="${col===0?'report-kind':col===1?'report-course':[3,6,9].includes(col)?'report-section-count':(col-4)%3===0?'report-grade-hours':''}${diff?' report-changed':''}">${editableCell(p,block,e,col,c,editable)}${diff&&(col-2)%3===1&&tr.per!=null?`<small class="report-per">${fmt(Math.round(tr.per*10)/10)}명</small>`:''}</td>`;}).join('')}
-   ${i===0?statCells(block.stats,report.hoursMode).map((v,col,values)=>`<td class="report-dept-stat ${col===values.length-1?'report-dept-average':''}${statChanged(block.stats,report.hoursMode,col)?' report-changed':''}" rowspan="${block.entries.length}">${text(v)}</td>`).join(''):''}</tr>`).join('')).join('')}
+   ${i===0?statCells(block.stats,report.hoursMode).map((v,col,values)=>`<td class="report-dept-stat ${col>=values.length-2?'report-dept-average':''}${col===values.length-1?' report-year-average':''}${statChanged(block.stats,report.hoursMode,col)?' report-changed':''}" rowspan="${block.entries.length}">${text(v)}</td>`).join(''):''}</tr>`).join('')).join('')}
    <tr class="report-total"><th colspan="3">${p.area} 전체 · 학기 합계</th>${p.gradeTotals.map((n,g)=>`<td></td><td></td><td class="${p.totals.gradesChanged?.[g]?'report-changed':''}">${fmt(n)}</td>`).join('')}${statCells(p.totals,report.hoursMode).map((n,col)=>`<td class="${statChanged(p.totals,report.hoursMode,col)?'report-changed':''}">${text(n)}</td>`).join('')}</tr></tbody></table>
    <p class="report-status">${esc(p.note)}${p.parts>1?' · 교과별 수치는 해당 교과 전체, 마지막 학기 합계는 모든 쪽을 합친 값입니다.':''}</p>
    <div class="report-footnotes">${p.footnotes.map(note=>`<p>${esc(note)}</p>`).join('')}</div>
