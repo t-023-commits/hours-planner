@@ -2,7 +2,7 @@
  'use strict';
  // 사이트를 새로 배포할 때마다 이 값을 올립니다. 값이 바뀌면 처음 열 때 초기값으로 시작하고,
  // 그 전 작업은 '버전 열기'에 자동 보관합니다.
- const SITE_VERSION='2026-10-30.4';
+ const SITE_VERSION='2026-11-03.1';
  const VERSIONS_KEY='curriculum-hours-planner-versions-v1',SITE_KEY='curriculum-hours-planner-site';
  root.createVersionUI=function({M,esc,getState,transact,persist,render,openDialog,closeDialog,toast,download}){
   let initial=null,versions=null;
@@ -16,6 +16,24 @@
    return initial;
   }
   const initialState=()=>M.clone(baseline());
+  // 함께 쓰는 게시 버전(published-versions.js): 초기값에 바뀐 값만 덧씌워 만듭니다. 모든 컴퓨터의 ‘버전 열기’에 나옵니다.
+  let shared=null;
+  function published(){
+   if(!shared){
+    shared=[];
+    for(const p of root.PUBLISHED_VERSIONS||[]){
+     try{
+      const s=M.clone(baseline());
+      for(const [id,v] of Object.entries(p.rows||{})){const r=s.rows.find(x=>x.id===id);if(!r)throw new Error(id);Object.assign(r,v);}
+      s.groupTargets={...s.groupTargets,...(p.groupTargets||{})};
+      const state=M.validateState(s);state.name=p.name;state.versionId=p.id;state.updatedAt=null;
+      shared.push({id:p.id,name:p.name,note:p.note||'',date:p.date||'',state});
+     }catch(e){/* 자료가 바뀌어 맞지 않는 게시 버전은 건너뜁니다. */}
+    }
+   }
+   return shared;
+  }
+  const find=id=>published().find(v=>v.id===id)||list().find(v=>v.id===id);
   const core=s=>JSON.stringify([s.rows,s.classes,s.teacherCounts,s.groupTargets||{},s.cohortStudents||{},s.weeks,s.classSize]);
   function list(){
    if(!versions){
@@ -29,7 +47,7 @@
    catch(e){toast('브라우저 저장 공간이 부족해 버전을 저장하지 못했습니다. ‘버전 열기’에서 쓰지 않는 버전을 지우거나 JSON 파일로 보관해 주세요.');return false;}
   }
   function coreOf(id){
-   if(!coreCache.has(id)){const s=id==='initial'?baseline():list().find(v=>v.id===id)?.state;coreCache.set(id,s?core(s):null);}
+   if(!coreCache.has(id)){const s=id==='initial'?baseline():find(id)?.state;coreCache.set(id,s?core(s):null);}
    return coreCache.get(id);
   }
   function info(s=getState()){
@@ -45,12 +63,12 @@
   const stamp=iso=>{const d=new Date(iso);return Number.isNaN(d.getTime())?'':`${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}. ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
   const newId=()=>`v${Date.now().toString(36)}${Math.random().toString(36).slice(2,6)}`;
   const fileName=name=>`${name.replace(/[\\/:*?"<>|]/g,'_')}.json`;
-  function nextName(){const used=new Set(list().map(v=>v.name));for(let n=1;;n++)if(!used.has(`버전 ${n}`))return `버전 ${n}`;}
+  function nextName(){const used=new Set([...published(),...list()].map(v=>v.name));for(let n=1;;n++)if(!used.has(`버전 ${n}`))return `버전 ${n}`;}
   function replace(next){const s=getState();for(const k of Object.keys(s))delete s[k];Object.assign(s,next);}
   function saveDialog(){
-   const s=getState(),own=s.versionId&&s.versionId!=='initial'&&list().some(v=>v.id===s.versionId);
+   const s=getState(),own=s.versionId&&s.versionId!=='initial'&&list().some(v=>v.id===s.versionId),pub=published().find(v=>v.id===s.versionId);
    openDialog('버전 저장','이름을 붙여 저장하면 인쇄물 제목과 PDF 파일 이름에도 이 이름이 들어갑니다.',
-    `<form id="version-form"><div class="form-grid"><label class="full">버전 이름<input id="version-name" maxlength="40" required value="${esc(own?s.name:nextName())}" placeholder="예: 버전 1"></label>
+    `<form id="version-form"><div class="form-grid"><label class="full">버전 이름<input id="version-name" maxlength="40" required value="${esc(own?s.name:pub?`${pub.name} 수정`:nextName())}" placeholder="예: 버전 1"></label>
      <label class="inline-check full"><input type="checkbox" id="version-file" checked> JSON 파일로도 내려받기 (다른 컴퓨터에서 ‘버전 열기 → JSON 파일 불러오기’로 사용)</label></div></form>
      <p class="field-help">같은 이름의 버전이 있으면 지금 내용으로 바꿔 저장합니다. 저장한 버전은 이 브라우저의 ‘버전 열기’에 남습니다.</p>`,
     '<button class="button primary" data-version-action="save">저장</button>');
@@ -62,6 +80,7 @@
    const name=el.value.trim(),error=document.getElementById('dialog-error');
    if(!name){error.textContent='버전 이름을 입력해 주세요.';return;}
    if(name==='초기값'){error.textContent='‘초기값’은 기본 버전 이름이라 쓸 수 없습니다.';return;}
+   if(published().some(v=>v.name===name)){error.textContent=`‘${name}’은 함께 쓰는 게시 버전 이름이라 쓸 수 없습니다. 다른 이름(예: ${name} 수정)을 붙여 주세요.`;return;}
    const s=getState(),all=list(),same=all.find(v=>v.name===name),id=same?.id||newId(),savedAt=new Date().toISOString();
    const snapshot=M.clone(s);snapshot.name=name;snapshot.versionId=id;snapshot.updatedAt=savedAt;
    const entry={id,name,savedAt,state:snapshot};
@@ -75,14 +94,15 @@
    const s=getState(),cur=info(s),all=list();
    const item=(id,name,meta,removable)=>`<div class="version-item${s.versionId===id?' current':''}"><div><b>${esc(name)}</b><small>${meta}</small></div><div class="version-buttons">${s.versionId===id&&!cur.modified?'<span class="version-now">지금 보는 버전</span>':`<button class="button small" data-version-open="${esc(id)}">${s.versionId===id?'저장된 상태로 열기':'열기'}</button>`}${removable?`<button class="button small subtle" data-version-delete="${esc(id)}">삭제</button>`:''}</div></div>`;
    openDialog('버전 열기','초기값이나 저장한 버전을 불러옵니다.',
-    `<div class="version-list">${item('initial','초기값','게시된 기본안 · 선택군 목표 = 학급 수 × 택N · 2027학년도 2·3학년 선택인원은 2026.10.28. 최종',false)}
+    `<div class="version-list">${item('initial','초기값','게시된 기본안 · 선택군 목표 = 학급 수 × 택N · 2027학년도 2·3학년 선택인원은 2026.10.28. 최종 · 공통·융합·교양 배정은 학교 배당표(9.28.) 기준',false)}
+     ${published().map(v=>item(v.id,v.name,`게시된 버전 · 모든 컴퓨터에서 열림 · ${esc(v.note)}`,false)).join('')}
      ${all.slice().reverse().map(v=>item(v.id,v.name,`${stamp(v.savedAt)} 저장`,true)).join('')||'<p class="field-help version-empty">아직 저장한 버전이 없습니다. 위쪽의 ‘버전 저장’으로 이름을 붙여 저장하세요.</p>'}</div>
      ${cur.modified?`<p class="field-help"><b>${esc(cur.name)}</b>에서 저장하지 않은 수정 내용은 다른 버전을 열면 화면에서 사라집니다. 바로 ‘되돌리기’로 복구할 수 있습니다.</p>`:''}
      <p class="field-help">버전은 이 브라우저에만 저장됩니다. 다른 컴퓨터에서 만든 버전은 JSON 파일로 불러오세요.</p>`,
     '<button class="button" data-version-action="file">JSON 파일 불러오기</button>');
   }
   function open(id){
-   const source=id==='initial'?initialState():M.clone(list().find(v=>v.id===id)?.state||null);
+   const source=id==='initial'?initialState():M.clone(find(id)?.state||null);
    if(!source)return;
    let next;
    try{next=M.validateState(source);}catch(e){toast(e.message);return;}
@@ -108,6 +128,8 @@
   // A plan read from a JSON file becomes a version in this browser so it keeps its own name.
   function adopt(s,file){
    if(core(s)===coreOf('initial')){s.name='초기값';s.versionId='initial';return s;}
+   const pub=published().find(v=>core(v.state)===core(s));
+   if(pub){s.name=pub.name;s.versionId=pub.id;return s;}
    let name=s.name&&!['초기값','기본 예상안'].includes(s.name)?s.name:file.replace(/\.json$/i,'');
    const all=list(),same=all.find(v=>v.name===name);
    if(same&&core(same.state)===core(s)){s.name=name;s.versionId=same.id;return s;}
@@ -125,7 +147,7 @@
     return {state:saved,reset:false,archived:null};
    }
    let archived=null;
-   if(saved&&core(saved)!==coreOf('initial')&&!list().some(v=>core(v.state)===core(saved))){
+   if(saved&&core(saved)!==coreOf('initial')&&![...published(),...list()].some(v=>core(v.state)===core(saved))){
     const d=new Date(),name=`자동 보관 ${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     const snapshot=M.clone(saved);snapshot.name=name;snapshot.versionId=newId();
     if(store([...list(),{id:snapshot.versionId,name,savedAt:d.toISOString(),state:snapshot}]))archived=name;
