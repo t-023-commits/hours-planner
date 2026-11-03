@@ -479,6 +479,8 @@
       }
       if(r.groupId!==null&&!D.groups.some(g=>g.id===r.groupId))throw new Error('선택군 정보가 올바르지 않습니다.');
       if(r.groupId!==null){const g=selectionGroup(r);if(r.required||g.cohort!==Math.min(r.cohort,2027)||g.grade!==r.grade||g.term!==r.term)throw new Error('과목과 선택군의 입학 연도·학년·학기가 맞지 않습니다.');}
+      // 2026.11.3. 잠시 역사과와 나눠 배정할 수 있던 사회문제 탐구는 다시 일반사회 자체 과목입니다.
+      if(r.relatedPlanning&&r.name==='사회문제 탐구'){delete r.relatedPlanning;r.allocations=[];}
       if(r.allocations===undefined){
         // Earlier versions could move a common course wholly to one department.
         // Retain that decision when upgrading, while allowing splits thereafter.
