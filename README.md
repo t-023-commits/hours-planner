@@ -5,6 +5,7 @@
 ## 2026.11.03 초기값 배정 · 게시 버전3
 
 - **초기값의 공통·융합·교양 배정**: 2027학년도 배정을 학교 배당표(9.28.)의 배분에 맞췄습니다. 통합사회1은 일반사회·지리·윤리, 통합사회2는 일반사회·역사·지리·윤리, 사회문제 탐구는 일반사회, 통합과학·과학탐구실험은 물리학·화학·생명과학·지구과학, 기후변화와 환경생태는 생명과학·지구과학만 담당합니다. 교양은 생태와 환경(음악·미술·중국어), 논리와 사고(한문), 인간과 심리(음악·미술·한문 각 1반, 정보·중국어 각 2반), 논술(음악·미술)입니다. 배당표의 윤리 15는 0.5반이 생기는 값이라 반 단위로 맞춰 7반(14)으로 했고, 통합사회2 2반은 일반사회에서 역사로 옮겼습니다(통합사회 담당: 일반사회 11반, 역사 2반, 지리 4반, 윤리 7반).
+- **창체 진로**: 2027학년도 2·3학년 창체 진로(학급당 주 1시간, 1·2학기 모두)를 ‘창체진로’ 과목으로 넣었습니다. 배당표대로 2학년은 음악 8·한문 4·영어 1반, 3학년은 미술 8·한문 4·영어 1반입니다. 1학년은 진로전담교사가 맡아 교과 시수에 넣지 않습니다. 이전에 저장한 예상안도 열면 자동으로 들어갑니다.
 - **인쇄 교사 평균**: A4 배당표 마지막에 ‘교사 1인 평균’을 그 학기와 학년도(1·2학기) 두 칸으로 나눠 싣습니다. 학년도 평균 = (1학기 + 2학기 총시수) ÷ (1학기 + 2학기 교사 수)로, 학교 배당표의 연평균과 같은 방식입니다.
 - **게시 버전**: published-versions.js의 버전은 모든 컴퓨터의 ‘버전 열기’에 나옵니다. 지우거나 같은 이름으로 덮어쓸 수 없으며, 고친 내용은 다른 이름으로 저장합니다. **버전3** = 새 초기값 + 버전2의 반 수 조정(2학년 일본어·일본 문화 11→10, 윤리와 사상 9→8, 3학년 일본어 회화 4→3, 도시의 미래 탐구 5→4, 역사로 탐구하는 현대 세계 4→3, 화학 반응의 세계 7→6, 여행지리 7→6).
 
@@ -105,7 +106,7 @@ A4 인쇄본과 같은 표(담당 교과 · 구분 · 과목명 · 학년별 반
 
 기존 주소 https://t-023-commits.github.io/curriculum/2027/ 에 덮어쓸 때는 현재 게시 중인 2027 폴더에 이 폴더의 파일과 downloads 폴더를 넣습니다. 새 저장소나 planner 폴더를 만들 필요가 없습니다. Pages가 docs를 게시한다면 docs/2027에 넣습니다. 루트의 교육과정 사이트는 건드리지 않습니다.
 
-2026.11.03 업데이트에서 published-versions.js가 새로 추가되었고 default-plan.js·planning-data.js·model.js·versions.js·grouped-report.js·print-report.css·index.html이 바뀌었습니다. 2026.10.30 업데이트에서 versions.js가, 2026.10.29 업데이트에서 choice-final.js·class-scenario.js·class-scenario.css가 새로 추가되었고 index.html, app.js, model.js, planning-model.js, selection-board.js, group-planning.js, README.md가 바뀌었습니다. 이 파일들을 함께 올려야 합니다. 이전 버전에서 저장한 예상안 JSON도 그대로 불러올 수 있습니다.
+2026.11.03 업데이트에서 published-versions.js가 새로 추가되었고 default-plan.js·planning-data.js·model.js·versions.js·grouped-report.js·print-report.css·class-scenario.js·app.js·index.html이 바뀌었습니다. 2026.10.30 업데이트에서 versions.js가, 2026.10.29 업데이트에서 choice-final.js·class-scenario.js·class-scenario.css가 새로 추가되었고 index.html, app.js, model.js, planning-model.js, selection-board.js, group-planning.js, README.md가 바뀌었습니다. 이 파일들을 함께 올려야 합니다. 이전 버전에서 저장한 예상안 JSON도 그대로 불러올 수 있습니다.
 
 빌드나 외부 라이브러리 없이 index.html로 동작합니다. downloads의 social-science-* 파일은 이전 참고 보정안 비교표입니다. adjusted-plan-source.json은 반 단위 정리 전 웹 저장안, adjusted-plan.json은 반 단위 정리 후 안, adjusted-plan-print.pdf는 그 인쇄본입니다. 현재 편집값은 A4 인쇄 · PDF, CSV, 버전 저장(JSON)으로 내보냅니다.
 

@@ -87,6 +87,19 @@
     for(const y of YEARS.filter(y=>y>=year))state.teacherCounts[y][dept]=[count,count];
   }
   const SHARED_DEPTS=['사회 공통','과학 공통·융합','교양'];
+  // 창체 진로 중 교과 교사가 맡는 몫(학교 배당표 9.28.). 학급마다 주 1시간, 1·2학기 같음.
+  // 1학년은 진로전담교사가 맡아 교과 시수에 넣지 않습니다.
+  const CAREER={name:'창체진로',year:2027,allocations:{2:{음악:8,한문:4,영어:1},3:{미술:8,한문:4,영어:1}}};
+  function addCareerRows(state){
+    for(const grade of [2,3])for(const term of [1,2]){
+      const id=`${CAREER.year}:career-${grade}-${term}`;
+      if(state.rows.some(r=>r.id===id))continue;
+      const cohort=CAREER.year-grade+1,sections=state.classes[cohort];
+      state.rows.push({id,cohort,grade,term,name:CAREER.name,dept:'교양',type:'창체',required:true,cross:false,groupId:null,hours:1,sourceRow:900,year:CAREER.year,curriculumCohort:cohort,
+        enabled:true,edited:false,notes:'창체 진로 중 교과 교사 담당분(학교 배당표 9.28.). 1학년은 진로전담교사 담당이라 제외.',students:null,sections,ref:null,
+        allocations:Object.entries(CAREER.allocations[grade]).map(([dept,hours])=>({dept,hours})),basis:'required'});
+    }
+  }
   const TEACHING_DEPTS=D.departments.filter(d=>!SHARED_DEPTS.includes(d));
   const sourceDepts=new Map(D.curriculum.map(r=>[r.id,r.dept]));
   function sharedCategory(row){
@@ -457,6 +470,8 @@
     }
     if(value.choiceVersion!==undefined&&(typeof value.choiceVersion!=='string'||value.choiceVersion.length>20))throw new Error('선택인원 자료 버전을 확인해 주세요.');
     applyFinalChoices(value);
+    // Plans saved before 2026.11.3 get the 창체 진로 rows the school's 배당표 counts.
+    addCareerRows(value);
     const ids=new Set(), courseKeys=new Set();
     for(const r of value.rows){
       if(typeof r.id!=='string'||r.id.length>150||ids.has(r.id))throw new Error('중복되거나 잘못된 과목 식별자가 있습니다.');

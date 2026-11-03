@@ -3,7 +3,7 @@
  // 반 수 시뮬레이션: 선택군 목표 반 수나 과목별 담당 반 수를 바꿨을 때 반당 인원·교과 시수·교사 1인 평균을 다시 계산합니다.
  const M=root.Planner;
  const EPS=1e-9;
- const KIND={'공통':'공통','공통 과목':'공통','일반':'일반','일반선택':'일반','일반 선택':'일반','진로':'진로','진로선택':'진로','진로 선택':'진로','융합':'융합','융합선택':'융합','융합 선택':'융합'};
+ const KIND={'공통':'공통','공통 과목':'공통','일반':'일반','일반선택':'일반','일반 선택':'일반','진로':'진로','진로선택':'진로','진로 선택':'진로','융합':'융합','융합선택':'융합','융합 선택':'융합','창체':'창체'};
  const kind=r=>KIND[r.type]||'기타';
  function cohortStudents(state,cohort){const n=state.cohortStudents?.[cohort];return Number.isInteger(n)&&n>0?n:null;}
  function groupRows(state,year,groupId){
