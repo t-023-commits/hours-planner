@@ -190,31 +190,52 @@
   return {total:groupRows(state,year,groupId).reduce((n,r)=>n+(r.enabled?r.sections??0:0),0),average:sections?students/sections:null,max,
    hours:M.round(rows.reduce((n,r)=>n+(M.hours(r)??0),0))};
  }
- root.ClassScenario={kind,cohortStudents,context,demandMap,perSection,portions,table,stepGroup,setPortion,portionCount,syncTarget,changes,groupSummary};
+ // Set a course's total sections (선택군 조율 tab). A shared course changes its assigned departments
+ // the same way as a −/＋ step here; the selection group's target follows the new total.
+ function setSections(state,rowId,n){
+  const r=state.rows.find(x=>x.id===rowId);
+  if(!r)return;
+  if(r.required)throw new Error('학교 지정 과목은 학급 수로 반 수가 정해집니다.');
+  if(!r.enabled)throw new Error('개설하지 않은 과목입니다. 먼저 ‘개설 켜기’를 눌러 주세요.');
+  if(!Number.isInteger(n)||n<0||n>100)throw new Error('반 수는 0~100 사이의 정수로 입력해 주세요.');
+  if(r.sections===null){r.sections=n;r.edited=true;}
+  else{const d=n>r.sections?1:-1;while(r.sections!==n)shiftCourse(state,r,d);}
+  if(r.groupId)syncTarget(state,r.year,r.groupId);
+ }
+ // Put one term of one year back to the 기준(초기값): sections, opening and shared allocations, and group targets.
+ function resetTerm(state,base,year,term){
+  const old=new Map(base.rows.map(r=>[r.id,r]));let n=0;
+  for(const r of state.rows.filter(r=>r.year===year&&r.term===term)){
+   const o=old.get(r.id);
+   if(!o||r.required)continue;
+   if(r.sections!==o.sections||r.enabled!==o.enabled||JSON.stringify(r.allocations||[])!==JSON.stringify(o.allocations||[])){
+    r.sections=o.sections;r.enabled=o.enabled;r.allocations=M.clone(o.allocations||[]);r.edited=o.edited;n++;
+   }
+  }
+  state.groupTargets=state.groupTargets||{};
+  for(const g of M.groupsForYear(year,null,term)){const k=`${year}:${g.id}`;if(base.groupTargets?.[k]!==undefined)state.groupTargets[k]=base.groupTargets[k];else delete state.groupTargets[k];}
+  return n;
+ }
+ root.ClassScenario={kind,cohortStudents,context,demandMap,perSection,portions,table,stepGroup,setPortion,setSections,resetTerm,portionCount,syncTarget,changes,groupSummary};
 })(globalThis);
 
 (function(root){
  'use strict';
- root.createClassScenarioUI=function({M,esc,f,header,getState,getYear,transact,render,toast}){
+ root.createClassScenarioUI=function({M,esc,f,header,getState,getBaseline,getYear,transact,render,toast}){
   const CS=root.ClassScenario;
   const ui={term:1,groupId:null,focus:false};
-  let draft=null,baseJSON='',dirty=false,rebase=null;
   const n1=x=>x===null||x===undefined||!Number.isFinite(x)?'—':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:1}).format(Math.round(x*10)/10);
   const signed=x=>!Number.isFinite(x)||Math.abs(x)<1e-9?'±0':`${x>0?'+':'−'}${f(Math.abs(x))}`;
   const tone=x=>x<-1e-9?'delta-down':x>1e-9?'delta-up':'';
   const deptLabel=d=>({생명과학:'생명<br>과학',지구과학:'지구<br>과학',일반사회:'일반<br>사회','사회 공통':'사회<br>공통','과학 공통·융합':'과학<br>공통·융합'}[d]||esc(d));
+  // Changes go straight into the plan, so 선택군 조율·A4 인쇄 show them at once.
+  // 기준 = 초기값 (학급 수 × 택N); the small grey line under a changed cell is the 기준 value.
   function sync(){
-   const s=getState(),json=JSON.stringify(s);
-   if(json!==baseJSON){
-    if(rebase){draft=rebase;rebase=null;}
-    else{if(draft&&dirty)toast('예상안이 바뀌어 시뮬레이션을 현재 예상안 기준으로 다시 시작했습니다.');draft=M.clone(s);dirty=false;}
-    baseJSON=json;
-   }
-   const y=getYear(),list=M.groupsForYear(y,null,ui.term);
+   const s=getState(),base=getBaseline(),y=getYear(),list=M.groupsForYear(y,null,ui.term);
    if(ui.groupId&&!list.some(g=>g.id===ui.groupId))ui.groupId=null;
-   return {s,y,list};
+   return {s,base,y,list};
   }
-  function was(show,text){return show?`<small class="cs-was">기존 ${text}</small>`:'';}
+  function was(show,text){return show?`<small class="cs-was">기준 ${text}</small>`:'';}
   function countCell(c){
    if(!c.editable)return `${f(c.now.sections)}${was(c.changed,f(c.old.sections))}`;
    const label=`${esc(c.dept)} 담당 반 수`;
@@ -239,42 +260,38 @@
     <tr class="cs-total"><th colspan="3">${y}학년도 ${ui.term}학기 합계</th>${t.grades.map(g=>`<td class="cs-g" colspan="3"></td><td class="num${g.now!==g.old?' cs-diff':''}"><b>${f(g.now)}</b>${was(g.now!==g.old,f(g.old))}</td>`).join('')}<td colspan="3"></td><td class="num${t.total.now!==t.total.old?' cs-diff':''}"><b>${f(t.total.now)}</b>${was(t.total.now!==t.total.old,f(t.total.old))}</td><td></td></tr>
    </tbody></table></div>`;
   }
-  function groupPanel(s,y,list,demand){
+  function groupPanel(s,base,y,list,demand){
    const g=list.find(x=>x.id===ui.groupId);
    if(!g)return `<p class="cs-hint">선택군을 고르면 목표 반 수를 −/＋로 한 번에 줄이거나 늘릴 수 있습니다. 표의 담당 반 수를 직접 바꿀 수도 있습니다.</p>`;
-   const now=CS.groupSummary(draft,y,g.id,demand),old=CS.groupSummary(s,y,g.id,demand),cohort=y-g.grade+1,base=M.baseGroupTarget(draft,y,g);
-   const stat=(label,a,b,fmt,unit)=>`<div class="cs-gp-stat${a!==b?' cs-diff':''}"><span>${label}</span><b>${fmt(a)}${a===null?'':unit}</b>${a!==b?`<small>기존 ${fmt(b)}${b===null?'':unit}</small>`:'<small>&nbsp;</small>'}</div>`;
-   return `<section class="cs-group-panel"><div class="cs-gp-title"><b>${g.grade}학년 ${g.term}학기 · 선택군 ${esc(g.code)} · 택${g.picks}</b><span>${cohort} 입학생${CS.cohortStudents(draft,cohort)?` ${CS.cohortStudents(draft,cohort)}명`:''} · ${draft.classes[cohort]}학급 · 기준 ${draft.classes[cohort]}학급 × 택${g.picks} = ${base}반</span></div>
-    <div class="cs-gp-target"><span>목표 반 수</span><div class="stepper"><button data-cs-group-step="-1" data-cs-focus="group-minus" aria-label="목표 반 수 1 줄이기" ${now.total>1?'':'disabled'}>−</button><input type="number" min="1" max="300" step="1" value="${now.total}" data-cs-group-total="1" data-cs-focus="group-total" aria-label="선택군 목표 반 수"><button data-cs-group-step="1" data-cs-focus="group-plus" aria-label="목표 반 수 1 늘리기">＋</button></div><small>${now.total!==old.total?`기존 ${old.total}반 · `:''}블록당 ${n1(now.total/g.picks)}반</small></div>
+   const now=CS.groupSummary(s,y,g.id,demand),old=CS.groupSummary(base,y,g.id,demand),cohort=y-g.grade+1,target=M.baseGroupTarget(s,y,g);
+   const stat=(label,a,b,fmt,unit)=>`<div class="cs-gp-stat${a!==b?' cs-diff':''}"><span>${label}</span><b>${fmt(a)}${a===null?'':unit}</b>${a!==b?`<small>기준 ${fmt(b)}${b===null?'':unit}</small>`:'<small>&nbsp;</small>'}</div>`;
+   return `<section class="cs-group-panel"><div class="cs-gp-title"><b>${g.grade}학년 ${g.term}학기 · 선택군 ${esc(g.code)} · 택${g.picks}</b><span>${cohort} 입학생${CS.cohortStudents(s,cohort)?` ${CS.cohortStudents(s,cohort)}명`:''} · ${s.classes[cohort]}학급 · 기준 ${s.classes[cohort]}학급 × 택${g.picks} = ${target}반</span></div>
+    <div class="cs-gp-target"><span>목표 반 수</span><div class="stepper"><button data-cs-group-step="-1" data-cs-focus="group-minus" aria-label="목표 반 수 1 줄이기" ${now.total>1?'':'disabled'}>−</button><input type="number" min="1" max="300" step="1" value="${now.total}" data-cs-group-total="1" data-cs-focus="group-total" aria-label="선택군 목표 반 수"><button data-cs-group-step="1" data-cs-focus="group-plus" aria-label="목표 반 수 1 늘리기">＋</button></div><small>${now.total!==old.total?`기준 ${old.total}반 · `:''}블록당 ${n1(now.total/g.picks)}반</small></div>
     ${stat('반당 평균 인원',now.average,old.average,n1,'명')}${stat('가장 큰 반',now.max,old.max,n1,'명')}${stat('선택군 시수',now.hours,old.hours,f,'시간')}
     <p class="cs-gp-help">−는 줄여도 반당 인원이 가장 적게 늘어나는 과목에서, ＋는 반당 인원이 가장 많은 과목에 1반씩 바꿉니다. 0반·미개설 과목은 건드리지 않습니다.</p></section>`;
   }
   function view(){
-   const {s,y,list}=sync(),demand=CS.demandMap(s,y),t=CS.table(draft,s,y,ui.term,demand);
-   const all=CS.changes(draft,s),here=all.filter(c=>c.year===y&&c.term===ui.term).length,diff=M.round(t.total.now-t.total.old);
-   const sum=g=>CS.groupSummary(draft,y,g.id,demand).total;
-   return header('반 수 시뮬레이션','선택군 목표 반 수나 과목별 담당 반 수를 바꾸면 반당 인원, 교과 시수, 교사 1인 평균이 바로 다시 계산됩니다. ‘예상안에 적용’을 누르기 전에는 예상안이 바뀌지 않습니다.')+
+   const {s,base,y,list}=sync(),demand=CS.demandMap(s,y),t=CS.table(s,base,y,ui.term,demand);
+   const all=CS.changes(s,base),here=all.filter(c=>c.year===y&&c.term===ui.term).length,diff=M.round(t.total.now-t.total.old);
+   const sum=g=>CS.groupSummary(s,y,g.id,demand).total;
+   return header('반 수 시뮬레이션','선택군 목표 반 수나 과목별 담당 반 수를 바꾸면 반당 인원, 교과 시수, 교사 1인 평균이 바로 다시 계산되고, 예상안에 바로 저장되어 선택군 조율·A4 인쇄에도 같이 바뀝니다. 노란 칸은 기준(초기값: 학급 수 × 택N)과 다른 칸입니다.')+
     `<div class="cs-bar"><div class="year-switch" role="group" aria-label="학기">${[1,2].map(n=>`<button data-cs-term="${n}" class="${ui.term===n?'active':''}" aria-pressed="${ui.term===n}">${n}학기</button>`).join('')}</div>
      <label>선택군 <select id="cs-group" data-cs-focus="group"><option value="">선택 안 함 · 과목별로 직접 조정</option>${list.map(g=>`<option value="${esc(g.id)}" ${ui.groupId===g.id?'selected':''}>${g.grade}학년 · 선택군 ${esc(g.code)} · 택${g.picks} (${sum(g)}반)</option>`).join('')}</select></label>
      <label class="inline-check"><input type="checkbox" id="cs-focus" ${ui.focus?'checked':''} ${ui.groupId?'':'disabled'}> 선택군 과목이 있는 교과만 보기</label>
      <span class="cs-students">학생 수 ${t.grades.map(g=>`<label>${g.grade}학년 <input type="number" min="1" max="2000" step="1" placeholder="미정" value="${g.students??''}" data-cs-students="${g.cohort}" data-cs-focus="st-${g.cohort}" aria-label="${g.grade}학년(${g.cohort} 입학생) 학생 수">명</label>`).join('')}</span></div>`+
-    groupPanel(s,y,list,demand)+
-    `<div class="cs-applybar${all.length?' has-changes':''}" role="status"><span>${y}학년도 ${ui.term}학기 교과 시수 합계 <b>${f(t.total.old)} → ${f(t.total.now)}</b>시간 <b class="${tone(diff)}">(${signed(diff)})</b> · 바뀐 과목 ${here}개${all.length>here?` · 다른 학기·학년도 포함 ${all.length}개`:''}</span>
-     <div class="actions"><button class="button small" data-cs-reset="1" ${all.length?'':'disabled'}>기존값으로</button><button class="button primary small" data-cs-apply="1" ${all.length?'':'disabled'}>예상안에 적용</button></div></div>`+
+    groupPanel(s,base,y,list,demand)+
+    `<div class="cs-applybar${here?' has-changes':''}" role="status"><span>${y}학년도 ${ui.term}학기 교과 시수 합계 기준 <b>${f(t.total.old)} → ${f(t.total.now)}</b>시간 <b class="${tone(diff)}">(${signed(diff)})</b> · 기준과 다른 과목 ${here}개${all.length>here?` · 다른 학기·학년도 포함 ${all.length}개`:''} · 바꾼 값은 바로 저장됩니다</span>
+     <div class="actions"><button class="button small" data-cs-reset="1" ${here?'':'disabled'}>이 학기 기준값으로</button></div></div>`+
     sheet(t,y)+
     `<p class="cs-foot">반당 인원 = 예상 선택 인원 ÷ 반 수이며, 선택과목은 괄호 안에 과목 전체 선택 인원을 함께 표시합니다(학교 지정 과목은 학생 수 ÷ 학급 수). 신청 인원은 선택자료, 없으면 참고 추정·과거 선택 환산을 쓰고, 학년 학생 수를 입력하면 ‘학생 수 × 택N’에 맞춰 환산합니다. 공통·융합 과목의 반을 줄이면 해당 교과의 배정이 함께 줄어듭니다. 학교 지정 과목은 학급 수로 정해지므로 ‘계산 기준·자료’에서 학급 수를 바꿉니다.</p>`;
   }
-  function edit(fn){
-   try{fn();dirty=true;}catch(e){toast(e.message);}
-  }
-  function apply(){
-   const s=getState(),n=CS.changes(draft,s).length;
-   if(!n)return;
-   try{
-    const next=M.validateState(draft);
-    dirty=false;
-    transact(()=>Object.assign(s,next),`반 수 변경 ${n}과목을 예상안에 적용했습니다. 다른 화면과 A4 인쇄에도 반영됩니다.`);
-   }catch(e){toast(e.message);}
+  // Try the change on a copy first, so a refused change leaves the plan as it was; ‘되돌리기’ undoes it.
+  function edit(fn,msg){
+   const s=getState(),next=M.clone(s);let result;
+   try{result=fn(next);}catch(e){toast(e.message);return null;}
+   if(JSON.stringify(next.rows)===JSON.stringify(s.rows)&&JSON.stringify(next.groupTargets||{})===JSON.stringify(s.groupTargets||{}))return result;
+   transact(()=>Object.assign(s,next),msg);
+   return result;
   }
   // Re-render after the browser has moved focus, then return focus to the same control.
   function later(fn){
@@ -294,34 +311,30 @@
    const d=b.dataset;
    if(d.csTerm){ui.term=Number(d.csTerm);ui.groupId=null;render();return;}
    if(d.csPick){if(d.csPickTerm)ui.term=Number(d.csPickTerm);ui.groupId=d.csPick;render();return;}
-   if(d.csGroupStep){const y=getYear();edit(()=>{if(!CS.stepGroup(draft,y,ui.groupId,Number(d.csGroupStep),CS.demandMap(getState(),y)))toast(Number(d.csGroupStep)<0?'모든 과목이 1반이라 더 줄일 수 없습니다. 과목을 닫으려면 담당 반 수를 0으로 입력하세요.':'더 늘릴 수 있는 과목이 없습니다.');});redraw(d.csFocus);return;}
+   if(d.csGroupStep){const y=getYear(),demand=CS.demandMap(getState(),y);if(edit(st=>CS.stepGroup(st,y,ui.groupId,Number(d.csGroupStep),demand))===0)toast(Number(d.csGroupStep)<0?'모든 과목이 1반이라 더 줄일 수 없습니다. 과목을 닫으려면 담당 반 수를 0으로 입력하세요.':'더 늘릴 수 있는 과목이 없습니다.');redraw(d.csFocus);return;}
    if(d.csStep){
-    const cur=CS.portionCount(draft,d.csRow,d.csDept);
-    edit(()=>CS.setPortion(draft,d.csRow,d.csDept,Math.max(0,cur+Number(d.csStep))));redraw(d.csFocus);return;
+    const cur=CS.portionCount(getState(),d.csRow,d.csDept);
+    edit(st=>CS.setPortion(st,d.csRow,d.csDept,Math.max(0,cur+Number(d.csStep))));redraw(d.csFocus);return;
    }
-   if(d.csReset){draft=M.clone(getState());dirty=false;render();toast('시뮬레이션을 기존 예상안으로 되돌렸습니다.');return;}
-   if(d.csApply)apply();
+   if(d.csReset){const y=getYear(),base=getBaseline(),n=edit(st=>CS.resetTerm(st,base,y,ui.term),`${y}학년도 ${ui.term}학기 반 수를 기준(초기값)으로 되돌렸습니다. ‘되돌리기’로 취소할 수 있습니다.`);if(n===0)toast('이미 기준과 같습니다.');return;}
   });
   document.addEventListener('change',e=>{
    const el=e.target,d=el.dataset||{};
    if(d.csStudents){
     if(!el.reportValidity())return;
     const c=Number(d.csStudents),v=el.value===''?null:Number(el.value);
-    later(()=>{
-     if(draft){draft.cohortStudents[c]=v;rebase=draft;}
-     transact(()=>{getState().cohortStudents[c]=v;},v===null?`${c} 입학생 학생 수를 미정으로 바꿨습니다.`:`${c} 입학생 ${v}명을 반당 인원 계산에 반영했습니다.`);
-    });
+    later(()=>transact(()=>{getState().cohortStudents[c]=v;},v===null?`${c} 입학생 학생 수를 미정으로 바꿨습니다.`:`${c} 입학생 ${v}명을 반당 인원 계산에 반영했습니다.`));
     return;
    }
    if(d.csCount){
     if(el.value===''||!el.reportValidity()){toast('담당 반 수는 0~100 사이의 정수로 입력해 주세요.');render();return;}
-    edit(()=>CS.setPortion(draft,d.csRow,d.csDept,Number(el.value)));later(render);return;
+    later(()=>{if(edit(st=>CS.setPortion(st,d.csRow,d.csDept,Number(el.value)))===null)render();});return;
    }
    if(d.csGroupTotal){
     if(!el.reportValidity())return;
-    const y=getYear(),now=CS.groupSummary(draft,y,ui.groupId,new Map()).total,delta=Number(el.value)-now;
-    if(delta)edit(()=>{const moved=CS.stepGroup(draft,y,ui.groupId,delta,CS.demandMap(getState(),y));if(moved<Math.abs(delta))toast(`${moved}반만 바꿀 수 있었습니다. 남은 과목이 1반이거나 최대치입니다.`);});
-    later(render);return;
+    const y=getYear(),now=CS.groupSummary(getState(),y,ui.groupId,new Map()).total,delta=Number(el.value)-now;
+    if(!delta)return;
+    later(()=>{const moved=edit(st=>CS.stepGroup(st,y,ui.groupId,delta,CS.demandMap(getState(),y)));if(moved!==null&&moved<Math.abs(delta))toast(`${moved}반만 바꿀 수 있었습니다. 남은 과목이 1반이거나 최대치입니다.`);});return;
    }
    if(el.id==='cs-group'){ui.groupId=el.value||null;if(!ui.groupId)ui.focus=false;later(render);return;}
    if(el.id==='cs-focus'){ui.focus=el.checked;later(render);}

@@ -1,10 +1,19 @@
 (function(root){
  'use strict';
- root.createSelectionBoard=function({M,esc,f,header,cohorts,getState,getYear,getTerm,transact,openDialog,closeDialog,render,toast,download}){
+ root.createSelectionBoard=function({M,esc,f,header,cohorts,getState,getBaseline,getYear,getTerm,transact,openDialog,closeDialog,render,toast,download}){
   const U=root.PlanningUpdates,P=root.PLANNING_DATA,D=root.CURRICULUM_DATA;
   let gradeFilter=0,pending=null;
   const period=()=>getTerm()||1;
   const current=()=>getState();
+  const CS=()=>root.ClassScenario;
+  const n1=x=>x===null||x===undefined||!Number.isFinite(x)?'—':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:1}).format(Math.round(x*10)/10);
+  const offered=r=>r?(r.enabled?r.sections:0):null;
+  // 기준 = 초기값(학급 수 × 택N으로 맞춘 개설 반). 지금 예상안의 반 수와 나란히 보여 줍니다.
+  function compareRow(r,bm,demand){
+   const b=bm.get(r.id),base=b?offered(b):null,now=offered(r),d=demand.get(r.id)??null;
+   const per=d!==null&&now>0?d/now:null,basePer=d!==null&&base>0?d/base:null;
+   return {base,now,d,per,basePer,changed:base!==null&&now!==base,baseHours:b?M.hours(b):null};
+  }
   function referenceCell(r){
    const demand=U.demandFor(r),ref=r.ref,fin=M.finalChoice(r);
    if(fin)return `<button class="reference-button" data-selection-reference="${esc(r.id)}"><strong>${f(fin.students)}명 <small> / ${f(fin.sections)}반</small></strong><span>2026.10.28. 최종 선택인원</span><span class="reference-link">선택자료·산정 근거 보기 ↗</span></button>`;
@@ -13,14 +22,20 @@
   function statusBanner(){return `<div class="update-banner"><div><b>${current().planningVersion===P.version?'경제·윤리 수요 보정안 기반':'기존에 저장한 예상안 유지 중'}</b><p>${current().planningVersion===P.version?'경제 57명 · 윤리와 사상 99명 참고 / 이후 직접 조율한 값은 현재 표에 반영됩니다.':'최신 보정값과 관련 교과 배정은 ‘보정안 비교·불러오기’에서 확인한 후 적용할 수 있습니다.'}</p></div><button class="button" data-selection-action="compare">보정안 비교·불러오기</button></div>`;}
   function view(){
    const y=getYear(),t=period(),s=current(),checks=M.groupChecks(s,y).filter(g=>g.term===t&&(!gradeFilter||g.grade===gradeFilter));
-   return header('선택군 조율','선택군의 전체 과목과 반 수를 보면서, 과거 신청인원을 참고해 함께 조정합니다.')+cohorts()+statusBanner()+
+   const bm=new Map((getBaseline()?.rows||[]).map(r=>[r.id,r])),demand=CS().demandMap(s,y);
+   const info=new Map(s.rows.filter(r=>r.year===y&&r.groupId).map(r=>[r.id,compareRow(r,bm,demand)]));
+   const baseSum=g=>s.rows.filter(r=>r.year===y&&r.groupId===g.id).reduce((n,r)=>n+(info.get(r.id).base??offered(r)??0),0);
+   return header('선택군 조율','선택군마다 기준 개설 반(학급 수 × 택N)과 지금 조정한 반 수, 예상 인원을 함께 봅니다.')+cohorts()+statusBanner()+
    `<div class="selection-toolbar"><div class="year-switch" role="group" aria-label="선택군 조회 학기">${[1,2].map(n=>`<button data-term="${n}" class="${n===t?'active':''}" aria-pressed="${n===t}">${n}학기</button>`).join('')}</div><label>조회 학년 <select id="selection-grade"><option value="0" ${!gradeFilter?'selected':''}>2·3학년 함께</option>${[2,3].map(g=>`<option value="${g}" ${gradeFilter===g?'selected':''}>${g}학년만</option>`).join('')}</select></label><div class="actions"><button class="button small" data-selection-action="csv">선택군 표 CSV</button><button class="button small" data-action="print">인쇄</button></div></div>
-   <div class="selection-guide"><b>반 수를 수정하면 같은 선택군이 함께 조정됩니다.</b> 직접 입력한 과목은 유지하고, 나머지 개설 과목을 현재 반 수 비율로 나눕니다. 목표 = 학급 수 × 택N이며, 반 수 시뮬레이션에서 목표를 바꾼 선택군은 조정 목표를 씁니다. 0반 과목을 새로 열려면 그 과목의 반 수를 직접 입력하세요.</div>
-   <nav class="group-jumps" aria-label="선택군 바로가기">${checks.map(g=>`<button data-selection-jump="${esc(g.id)}" class="${g.actual!==g.target||g.unknown?'needs-review':''}">${g.grade}학년 ${g.code} · 택${g.picks} <b>${g.actual}/${g.target}반</b></button>`).join('')}</nav>
+   <div class="selection-guide"><b>기준 반 수</b>는 초기값(학급 수 × 택N으로 맞춘 개설 반)이고, <b>조정 반 수</b>는 지금 예상안의 반 수입니다. 조정 반 수를 바꾸면 그 과목만 바뀌고 선택군 합계도 함께 바뀌며, 반 수 시뮬레이션·A4 인쇄에 바로 반영됩니다. 반 수 시뮬레이션에서 바꾼 값도 여기에 그대로 나옵니다. 노란 칸은 기준과 다른 과목입니다. 합계는 그대로 두고 과목끼리 반을 다시 나누려면 ‘함께 조율’을 누르세요.</div>
+   <nav class="group-jumps" aria-label="선택군 바로가기">${checks.map(g=>{const b=baseSum(g);return `<button data-selection-jump="${esc(g.id)}" class="${g.unknown||g.actual!==g.target?'needs-review':g.actual!==b?'changed':''}">${g.grade}학년 ${g.code} · 택${g.picks} <b>${g.actual}${g.actual!==b?` / 기준 ${b}`:''}반</b></button>`;}).join('')}</nav>
    ${[2,3].filter(g=>!gradeFilter||gradeFilter===g).map(grade=>`<section class="selection-grade-section"><div class="selection-grade-heading"><span>${grade}학년</span><h2>${y-grade+1}학년도 입학생</h2><p>${s.classes[y-grade+1]}학급 · ${t}학기</p></div>${checks.filter(g=>g.grade===grade).map(g=>{
     const rows=s.rows.filter(r=>r.year===y&&r.groupId===g.id).sort((a,b)=>a.sourceRow-b.sourceRow),first=rows[0],ok=g.actual===g.target&&!g.unknown;
-    return `<section class="surface selection-card" id="selection-${esc(g.id)}"><div class="selection-card-head"><div><span class="selection-code">선택군 ${g.code}</span><h3>택${g.picks} <small>· ${s.classes[first.cohort]}학급 × ${g.picks}과목 = ${g.base}반${g.override?` → 조정 목표 ${g.target}반`:''}</small></h3><button class="text-button selection-scenario-link" data-view="classplan" data-cs-pick="${esc(g.id)}" data-cs-pick-term="${g.term}">반 수 줄여 보기 →</button></div><div class="selection-total ${ok?'balanced':'needs-review'}"><b>${g.actual} / ${g.target}반</b><span>${g.unknown?`미정 ${g.unknown}과목`:ok?'선택군 합계 일치':`${Math.abs(g.actual-g.target)}반 ${g.actual>g.target?'초과':'부족'}`}</span></div><button class="button small" data-balance-group="${esc(first.id)}">함께 조율</button></div>
-    <div class="selection-table-scroll"><table class="selection-table"><thead><tr><th>과목 · 담당 교과</th><th class="center">예상 개설 반 수</th><th class="num">반당 시수</th><th class="num">주당 총시수</th><th>과거 선택자료 <small>· 예상 인원과 구분</small></th></tr></thead><tbody>${rows.map(r=>`<tr class="${!r.enabled||r.sections===0?'not-offered':''}"><td><button class="subject-button" data-edit="${esc(r.id)}">${esc(r.name)}</button><div class="subject-meta">${esc(r.relatedPlanning&&P.rules.find(x=>x.name===r.name)?.allowed.join(' · ')||r.dept)}${!r.enabled?' · 미개설':r.sections===0?' · 0반':r.edited?' · 직접 조율':''}</div></td><td class="center"><div class="stepper"><button data-step="-1" data-id="${esc(r.id)}" aria-label="${esc(r.name)} ${grade}학년 반 1개 줄이기" ${r.enabled?'':'disabled'}>−</button><input class="editable" type="number" min="0" max="100" step="1" placeholder="미정" data-field="sections" data-id="${esc(r.id)}" value="${r.sections??''}" aria-label="${y}학년도 ${grade}학년 선택군 ${g.code} ${esc(r.name)} 예상 반 수" ${r.enabled?'':'disabled'}><button data-step="1" data-id="${esc(r.id)}" aria-label="${esc(r.name)} ${grade}학년 반 1개 늘리기" ${r.enabled?'':'disabled'}>＋</button></div>${!r.enabled?`<button class="text-button" data-toggle="${esc(r.id)}">개설 켜기</button>`:''}</td><td class="num">${f(r.hours)}</td><td class="num selection-hours">${f(M.hours(r))}</td><td>${referenceCell(r)}</td></tr>`).join('')}</tbody><tfoot><tr><th>선택군 ${g.code} 합계</th><td class="center"><b>${g.actual}반</b></td><td></td><td class="num"><b>${f(rows.reduce((n,r)=>n+(M.hours(r)??0),0))}</b></td><td>${g.unknown?'미정 제외 입력분':'단위: 시간/주'}</td></tr></tfoot></table></div></section>`;
+    const b=baseSum(g),diff=g.actual-b,mismatch=g.unknown||g.actual!==g.target;
+    const known=rows.filter(r=>info.get(r.id).d!==null&&offered(r)>0),avg=known.length?known.reduce((n,r)=>n+info.get(r.id).d,0)/known.reduce((n,r)=>n+offered(r),0):null;
+    const hours=rows.reduce((n,r)=>n+(M.hours(r)??0),0),baseHours=rows.reduce((n,r)=>n+(info.get(r.id).baseHours??M.hours(r)??0),0);
+    return `<section class="surface selection-card" id="selection-${esc(g.id)}"><div class="selection-card-head"><div><span class="selection-code">선택군 ${g.code}</span><h3>택${g.picks} <small>· 기준 ${s.classes[first.cohort]}학급 × ${g.picks}과목 = ${g.base}반</small></h3><button class="text-button selection-scenario-link" data-view="classplan" data-cs-pick="${esc(g.id)}" data-cs-pick-term="${g.term}">반 수 시뮬레이션에서 보기 →</button></div><div class="selection-total ${mismatch?'needs-review':diff?'changed':'balanced'}"><b>조정 ${g.actual}반 <small>/ 기준 ${b}반</small></b><span>${g.unknown?`미정 ${g.unknown}과목`:g.actual!==g.target?`목표 ${g.target}반과 ${Math.abs(g.actual-g.target)}반 차이 · 점검 필요`:diff?`기준보다 ${Math.abs(diff)}반 ${diff<0?'적음':'많음'}`:'기준과 같음'}</span></div><button class="button small" data-balance-group="${esc(first.id)}">함께 조율</button></div>
+    <div class="selection-table-scroll"><table class="selection-table sb-table"><thead><tr><th>과목 · 담당 교과</th><th class="center">기준<br>개설 반</th><th class="center">조정 반 수</th><th class="num">예상 인원<br><small>반당 · (선택 인원)</small></th><th class="num">반당<br>시수</th><th class="num">주당<br>총시수</th><th>과거 선택자료 <small>· 예상 인원과 구분</small></th></tr></thead><tbody>${rows.map(r=>{const c=info.get(r.id),k=`${esc(r.id)}`;return `<tr class="${!r.enabled||r.sections===0?'not-offered':''}${c.changed?' sb-changed':''}"><td><button class="subject-button" data-edit="${k}">${esc(r.name)}</button><div class="subject-meta">${esc(r.relatedPlanning&&P.rules.find(x=>x.name===r.name)?.allowed.join(' · ')||r.dept)}${!r.enabled?' · 미개설':r.sections===0?' · 0반':''}</div></td><td class="center sb-base">${c.base===null?'—':`${c.base}반`}</td><td class="center sb-now"><div class="stepper"><button data-sb-step="-1" data-sb-id="${k}" data-sb-focus="m-${k}" aria-label="${esc(r.name)} ${grade}학년 반 1개 줄이기" ${r.enabled&&r.sections>0?'':'disabled'}>−</button><input class="editable" type="number" min="0" max="100" step="1" placeholder="미정" data-sb-sections="1" data-sb-id="${k}" data-sb-focus="n-${k}" value="${r.sections??''}" aria-label="${y}학년도 ${grade}학년 선택군 ${g.code} ${esc(r.name)} 조정 반 수" ${r.enabled?'':'disabled'}><button data-sb-step="1" data-sb-id="${k}" data-sb-focus="p-${k}" aria-label="${esc(r.name)} ${grade}학년 반 1개 늘리기" ${r.enabled?'':'disabled'}>＋</button></div>${c.changed?`<small class="sb-was">기준 대비 ${c.now-c.base>0?'+':'−'}${Math.abs(c.now-c.base)}반</small>`:''}${!r.enabled?`<button class="text-button" data-sb-toggle="${k}">개설 켜기</button>`:''}</td><td class="num sb-per"><b>${c.per===null?'—':`${n1(c.per)}명`}</b>${c.d!==null?`<small>(${Math.round(c.d)}명)</small>`:''}${c.changed&&c.basePer!==null?`<small class="sb-was">기준 ${n1(c.basePer)}명</small>`:''}</td><td class="num">${f(r.hours)}</td><td class="num selection-hours">${f(M.hours(r))}${c.changed&&c.baseHours!==null?`<small class="sb-was">기준 ${f(c.baseHours)}</small>`:''}</td><td>${referenceCell(r)}</td></tr>`;}).join('')}</tbody><tfoot><tr><th>선택군 ${g.code} 합계</th><td class="center"><b>${b}반</b></td><td class="center${diff?' sb-total-changed':''}"><b>${g.actual}반</b>${diff?`<small class="sb-was">기준 대비 ${diff>0?'+':'−'}${Math.abs(diff)}반</small>`:''}</td><td class="num">${avg===null?'':`반당 <b>${n1(avg)}명</b>`}</td><td></td><td class="num"><b>${f(M.round(hours))}</b>${M.round(hours)!==M.round(baseHours)?`<small class="sb-was">기준 ${f(M.round(baseHours))}</small>`:''}</td><td>${g.unknown?'미정 제외 입력분':'단위: 시간/주'}</td></tr></tfoot></table></div></section>`;
    }).join('')||'<p>해당 학기에 학생 선택군이 없습니다.</p>'}</section>`).join('')}
    <section class="surface selection-followup"><div><h2>반 수를 조율한 뒤 시수 배정도 확인하세요</h2><p>기존 배정시수는 보존됩니다. 반 수가 바뀌면 아래에서 관련 교과 배정안을 다시 검토할 수 있습니다. 교양은 ‘시수 배정’에서 별도로 조정합니다.</p></div><button class="button primary" data-selection-action="allocate">${t}학기 사회·과학 재배정 검토</button><button class="button" data-view="teachers">교사 평균 보기</button></section>
    <div class="report-links"><a class="button" href="downloads/social-science-comparison.xlsx" download>엑셀 비교표 받기</a><button class="button primary" data-view="print">현재 예상안 A4 인쇄 · PDF</button><a href="downloads/adjusted-plan-print.pdf" target="_blank" rel="noopener">첨부 조율안 PDF (고정본)</a><span>현재 수정값은 A4 인쇄 · PDF에서 출력합니다. 엑셀 비교표와 고정 PDF는 작성 당시 값입니다.</span></div>`;
@@ -58,7 +73,7 @@
     '<button class="button primary" data-selection-action="apply-allocation">이 학기 재배정 적용</button>');
    document.querySelector('#dialog').classList.add('selection-dialog');
   }
-  function csv(){const y=getYear(),t=period();download(`${y}학년도_${t}학기_선택군_반수.csv`,M.csv([['학년도','학년','학기','입학연도','선택군','선택수','학급수','기준반수','목표반수','과목','교과','개설반수','반당시수','총시수','참고 선택자료','추정 근거'],...current().rows.filter(r=>r.year===y&&r.term===t&&r.groupId&&(!gradeFilter||r.grade===gradeFilter)).map(r=>{const g=M.selectionGroup(r);return [y,r.grade,t,r.cohort,g.code,g.picks,current().classes[r.cohort],M.baseGroupTarget(current(),y,g),M.groupTarget(current(),y,g),r.name,r.dept,r.enabled?r.sections:0,r.hours,M.hours(r),U.referenceText(r),U.projectionText(r)];})]),'text/csv;charset=utf-8');}
+  function csv(){const y=getYear(),t=period(),bm=new Map((getBaseline()?.rows||[]).map(r=>[r.id,r])),demand=CS().demandMap(current(),y);download(`${y}학년도_${t}학기_선택군_반수.csv`,M.csv([['학년도','학년','학기','입학연도','선택군','선택수','학급수','기준반수','목표반수','과목','교과','기준 개설반수(초기값)','조정 개설반수','예상 인원','반당 인원','반당시수','총시수','참고 선택자료','추정 근거'],...current().rows.filter(r=>r.year===y&&r.term===t&&r.groupId&&(!gradeFilter||r.grade===gradeFilter)).map(r=>{const g=M.selectionGroup(r),c=compareRow(r,bm,demand);return [y,r.grade,t,r.cohort,g.code,g.picks,current().classes[r.cohort],M.baseGroupTarget(current(),y,g),M.groupTarget(current(),y,g),r.name,r.dept,c.base??'',r.enabled?r.sections:0,c.d===null?'':Math.round(c.d),c.per===null?'':M.round(c.per),r.hours,M.hours(r),U.referenceText(r),U.projectionText(r)];})]),'text/csv;charset=utf-8');}
   document.addEventListener('click',e=>{
    const b=e.target.closest('button');if(!b||b.disabled)return;
    if(b.dataset.selectionReference){reference(b.dataset.selectionReference);return;}
@@ -67,7 +82,27 @@
    if(action==='compare')compare();if(action==='load-existing')load('existing');if(action==='load-moved')load('moved');if(action==='allocate')allocationPreview();if(action==='csv')csv();
    if(action==='apply-allocation'&&pending){const validated=M.validateState(pending);transact(()=>Object.assign(current(),validated),'관련 교과 배정을 평균 시수에 반영했습니다.');pending=null;closeDialog();}
   });
-  document.addEventListener('change',e=>{if(e.target.id==='selection-grade'){gradeFilter=Number(e.target.value);render();}});
+  // 조정 반 수: the same plan the 반 수 시뮬레이션 edits, so both tabs always agree. ‘되돌리기’ undoes a change.
+  function setSections(id,n,focus){
+   const s=current(),next=M.clone(s);
+   try{CS().setSections(next,id,n);}catch(err){toast(err.message);render();return;}
+   if(JSON.stringify(next.rows)!==JSON.stringify(s.rows)||JSON.stringify(next.groupTargets||{})!==JSON.stringify(s.groupTargets||{}))transact(()=>Object.assign(s,next));
+   if(focus)document.querySelector(`[data-sb-focus="${CSS.escape(focus)}"]`)?.focus({preventScroll:true});
+  }
+  document.addEventListener('click',e=>{
+   const b=e.target.closest('button');if(!b||b.disabled)return;
+   if(b.dataset.sbStep){const r=current().rows.find(x=>x.id===b.dataset.sbId);if(r)setSections(r.id,Math.min(100,Math.max(0,(r.sections??0)+Number(b.dataset.sbStep))),b.dataset.sbFocus);return;}
+   if(b.dataset.sbToggle){const s=current(),next=M.clone(s),r=next.rows.find(x=>x.id===b.dataset.sbToggle);if(!r)return;r.enabled=true;r.edited=true;if(r.groupId)CS().syncTarget(next,r.year,r.groupId);transact(()=>Object.assign(s,next),`${r.name}을(를) 개설했습니다. 반 수를 입력해 주세요.`);}
+  });
+  document.addEventListener('change',e=>{
+   if(e.target.id==='selection-grade'){gradeFilter=Number(e.target.value);render();return;}
+   const el=e.target;
+   if(el.dataset.sbSections){
+    if(el.value===''||!el.reportValidity()){toast('반 수는 0~100 사이의 정수로 입력해 주세요.');render();return;}
+    const id=el.dataset.sbId,n=Number(el.value);
+    setTimeout(()=>setSections(id,n,document.activeElement?.dataset?.sbFocus),0);
+   }
+  });
   document.querySelector('#dialog').addEventListener('close',()=>{document.querySelector('#dialog').classList.remove('selection-dialog');pending=null;});
   return {view,statusBanner};
  };

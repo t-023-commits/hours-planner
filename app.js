@@ -90,9 +90,9 @@
  $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const rect=$('#dialog').getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)closeDialog();}});
  const R=createPrintReportUI({getState:()=>state,header,getVersion:()=>V.info().label,getBaseline:()=>V.baseline()});
  const G=createGroupPlanningUI({M,esc,f,getState:()=>state,transact,openDialog,closeDialog,render,toast});
- const S=createSelectionBoard({M,esc,f,header,cohorts,getState:()=>state,getYear:()=>year,getTerm:()=>term,transact,openDialog,closeDialog,render,toast,download});
+ const S=createSelectionBoard({M,esc,f,header,cohorts,getState:()=>state,getBaseline:()=>V.baseline(),getYear:()=>year,getTerm:()=>term,transact,openDialog,closeDialog,render,toast,download});
  const A=createAssignmentUI({M,esc,f,header,cohorts,options,transact,openDialog,closeDialog,toast,download,render,getState:()=>state,getYear:()=>year});
- const C=createClassScenarioUI({M,esc,f,header,cohorts,getState:()=>state,getYear:()=>year,transact,render,toast,download});
+ const C=createClassScenarioUI({M,esc,f,header,cohorts,getState:()=>state,getBaseline:()=>V.baseline(),getYear:()=>year,transact,render,toast,download});
  const V=createVersionUI({M,esc,getState:()=>state,transact,persist,render,openDialog,closeDialog,toast,download});
  // Published defaults apply only before a browser has its own saved plan.
  // Each new site release opens on 초기값; the previous working plan is kept under '버전 열기'.
