@@ -2,7 +2,7 @@
  'use strict';
  // 사이트를 새로 배포할 때마다 이 값을 올립니다. 값이 바뀌면 처음 열 때 초기값으로 시작하고,
  // 그 전 작업은 '버전 열기'에 자동 보관합니다.
- const SITE_VERSION='2026-11-24.2';
+ const SITE_VERSION='2026-11-26.1';
  const VERSIONS_KEY='curriculum-hours-planner-versions-v1',SITE_KEY='curriculum-hours-planner-site';
  root.createVersionUI=function({M,esc,getState,transact,persist,render,openDialog,closeDialog,toast,download}){
   let initial=null,versions=null;
@@ -26,6 +26,7 @@
       const s=M.clone(baseline());
       for(const [id,v] of Object.entries(p.rows||{})){const r=s.rows.find(x=>x.id===id);if(!r)throw new Error(id);Object.assign(r,v);}
       s.groupTargets={...s.groupTargets,...(p.groupTargets||{})};
+      for(const [y,depts] of Object.entries(p.teacherCounts||{}))for(const [d,v] of Object.entries(depts)){if(!s.teacherCounts[y]?.[d])throw new Error(`${y} ${d}`);s.teacherCounts[y][d]=[...v];}
       const state=M.validateState(s);state.name=p.name;state.versionId=p.id;state.updatedAt=null;
       shared.push({id:p.id,name:p.name,note:p.note||'',date:p.date||'',state});
      }catch(e){/* 자료가 바뀌어 맞지 않는 게시 버전은 건너뜁니다. */}
